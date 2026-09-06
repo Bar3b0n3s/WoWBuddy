@@ -210,6 +210,11 @@ public sealed class FakeBotState : IBotState
     /// <summary>Whether the bags hold anything a vendor would pay for.</summary>
     public bool HasSellableItems { get; set; } = true;
 
+    /// <summary>Business with a vendor or a mailbox.</summary>
+    public FakeVendor VendorState { get; } = new();
+
+    public IVendorActions Vendor => VendorState;
+
     public void EndErrand()
     {
         Actions.Add($"EndErrand({CurrentErrand})");

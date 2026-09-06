@@ -29,6 +29,12 @@ zero, anything may change.
   [docs/status.md](docs/status.md) for what that means in practice.
 - A crafting bot base, and buying materials for one.
 
+### Added
+
+- **Errands are now carried out, not just decided.** `ErrandHandler` walks to a vendor from the
+  profile's `Vendors` section, repairs, sells what the loot rules pick, and posts keepable items
+  to another character. `LuaVendor` does the client half.
+
 ### Fixed
 
 - **Errands no longer deadlock the bot.** An errand began, the branch above the bot base

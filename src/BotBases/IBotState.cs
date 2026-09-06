@@ -212,4 +212,7 @@ public interface IBotState
 
     /// <summary>Queueing for and sitting inside a battleground.</summary>
     IBattlegroundActions Battlegrounds { get; }
+
+    /// <summary>Doing business with a vendor or a mailbox.</summary>
+    IVendorActions Vendor { get; }
 }

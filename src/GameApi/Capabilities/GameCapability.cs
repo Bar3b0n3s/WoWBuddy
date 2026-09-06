@@ -44,6 +44,9 @@ public enum GameCapability
 
     /// <summary>Reading what the character can make, and making it.</summary>
     TradeSkills,
+
+    /// <summary>Doing business with a vendor or a mailbox.</summary>
+    Vendor,
 }
 
 /// <summary>One thing to ask the client about itself.</summary>

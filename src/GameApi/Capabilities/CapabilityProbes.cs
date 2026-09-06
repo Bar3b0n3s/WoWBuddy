@@ -109,6 +109,15 @@ public static class CapabilityProbes
              "CloseTradeSkill"],
             "reading what the character can make, and making it",
             "The crafting base cannot run."),
+
+        // Frames are tables, not functions, so the windows themselves cannot be probed this
+        // way — only the calls. That is the honest limit of an existence check.
+        new(GameCapability.Vendor,
+            ["CanMerchantRepair", "RepairAllItems", "GetRepairAllCost", "UseContainerItem",
+             "GetContainerItemInfo", "GetItemInfo", "SendMail", "ClearSendMail",
+             "CloseMerchant", "CloseMail"],
+            "selling, repairing and posting mail",
+            "Errands cannot be carried out; the bot will keep playing and let the bags fill."),
     ];
 
     /// <summary>Asks the client about every capability.</summary>

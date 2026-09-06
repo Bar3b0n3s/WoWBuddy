@@ -3,6 +3,7 @@ using System.IO;
 using System.Threading;
 using WoWBuddy.Behavior;
 using WoWBuddy.BotBases;
+using WoWBuddy.BotBases.Support;
 using WoWBuddy.Core.Attach;
 using WoWBuddy.Common.Logging;
 using WoWBuddy.Core.Execution;
@@ -220,11 +221,28 @@ public sealed class BotController : IBotController
 
         LiveBotState state = Compose(execution, chosen);
 
+        // Errands only run when the profile says where the vendors are. Without that the
+        // branch stays off, which is the right answer: the planner would keep deciding a trip
+        // was due and nothing would ever be able to make it.
+        ErrandPlanner? planner = null;
+        Node<IBotState>? errandHandler = null;
+
+        if (profile is { Vendors.Count: > 0 })
+        {
+            planner = new ErrandPlanner(new ErrandSettings());
+
+            errandHandler = new ErrandHandler(new ErrandHandlerSettings
+            {
+                Vendors = profile.Vendors,
+            })
+            .Build();
+        }
+
         // Movement is the last gate. Nothing writes to the client's click-to-move block until
         // this line, and a user who never gets here has had nothing injected that moves them.
         _movement!.Enable();
 
-        _runner = new BotRunner(state, RootTree.Build(_tree!).Root);
+        _runner = new BotRunner(state, RootTree.Build(_tree!, planner, errandHandler).Root);
         _runner.Start();
 
         // A tick every quarter second. Faster buys nothing — the client's own update rate is
@@ -261,6 +279,7 @@ public sealed class BotController : IBotController
             new LuaPartyState(lua, _capabilities!, () => view.Position, view.Locate),
             new LuaBattlegrounds(lua, _capabilities!),
             new LuaInventory(lua, _capabilities!),
+            new LuaVendor(lua, _capabilities!),
             new SessionScheduler(new SessionSchedule()),
             routine,
             new LiveCombatContext(lua, view, _caster));

@@ -70,17 +70,17 @@ unselectable or pacified units, then treats the rest as fair game. It will offer
 critter as a target. A profile's avoid list is the intended cover, and a user with faction data
 can supply a better rule.
 
-### Errands are decided but never carried out
+### Errands need a profile that names vendors, and cannot train
 
-`ErrandPlanner` works out when the character should go and repair, sell, mail or train.
-Nothing performs any of it — there is no vendor interaction, no `RepairAllItems`, no selling,
-no mail.
+`ErrandHandler` walks to a vendor, repairs, sells the junk the loot rules pick, and posts
+keepable items to another character. It needs somewhere to go, and vendor locations are game
+data, so **errands only run when the loaded profile has a `Vendors` section**. Without one the
+branch stays off — beginning an errand nothing can finish is worse than not starting one, and
+that is exactly what used to happen.
 
-So `RootTree.Build` takes an errand handler, and **without one the errand branch is off
-entirely**. That is deliberate rather than a stopgap: beginning an errand nothing can finish is
-worse than not starting one, and it is exactly what used to happen — the branch reported that
-it was still working, sat above the bot base, and the character stood still for the rest of the
-night the first time its bags filled.
+**Training is not implemented.** It needs a trainer for the character's own class, which a
+profile has no way to express and this project has no data for. The planner can ask for it; the
+handler reports that it cannot and abandons the errand.
 
 ### No crafting bot base
 

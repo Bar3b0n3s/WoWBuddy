@@ -49,6 +49,7 @@ public sealed class LiveBotState : IBotState, IProfileConditionContext
     private readonly LuaPartyState _party;
     private readonly LuaBattlegrounds _battlegrounds;
     private readonly LuaInventory _inventory;
+    private readonly LuaVendor _vendor;
     private readonly SessionScheduler _session;
 
     private readonly Func<DateTimeOffset> _clock;
@@ -64,6 +65,7 @@ public sealed class LiveBotState : IBotState, IProfileConditionContext
         LuaPartyState party,
         LuaBattlegrounds battlegrounds,
         LuaInventory inventory,
+        LuaVendor vendor,
         SessionScheduler session,
         ICombatRoutine routine,
         ICombatContext combat,
@@ -79,6 +81,7 @@ public sealed class LiveBotState : IBotState, IProfileConditionContext
         _party = party ?? throw new ArgumentNullException(nameof(party));
         _battlegrounds = battlegrounds ?? throw new ArgumentNullException(nameof(battlegrounds));
         _inventory = inventory ?? throw new ArgumentNullException(nameof(inventory));
+        _vendor = vendor ?? throw new ArgumentNullException(nameof(vendor));
         _session = session ?? throw new ArgumentNullException(nameof(session));
 
         Routine = routine ?? throw new ArgumentNullException(nameof(routine));
@@ -274,6 +277,9 @@ public sealed class LiveBotState : IBotState, IProfileConditionContext
     /// <inheritdoc />
     public IBattlegroundActions Battlegrounds => _battlegrounds;
 
+    /// <inheritdoc />
+    public IVendorActions Vendor => _vendor;
+
     // ---- what a profile condition asks about ----------------------------------------------------
 
     /// <inheritdoc />
@@ -339,5 +345,6 @@ public sealed class LiveBotState : IBotState, IProfileConditionContext
         _party.Invalidate();
         _battlegrounds.Invalidate();
         _inventory.Invalidate();
+        _vendor.Invalidate();
     }
 }

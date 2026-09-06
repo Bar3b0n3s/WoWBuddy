@@ -36,6 +36,7 @@ public sealed class BotRunnerTests
             new LuaPartyState(lua, capabilities, () => view.Position, view.Locate, () => Now),
             new LuaBattlegrounds(lua, capabilities, () => Now),
             new LuaInventory(lua, capabilities, () => Now),
+            new LuaVendor(lua, capabilities, () => Now),
             new SessionScheduler(new SessionSchedule()),
             new FuryWarrior(),
             new StubCombat(),
