@@ -76,15 +76,28 @@ Try these and compare with the game:
 That last one is the useful one: it is the same number arriving by two completely
 independent routes, memory reads and the Lua interpreter. If they agree, both are right.
 
-Then confirm the protection is real. Target something and type:
+Then settle the protected-function question for your client. Type:
+
+```
+issecure()
+```
+
+**Expect `true`.** The client tracks taint through the script VM and refuses protected
+functions to *addon* code; a script handed straight to the client's own entry point from the
+render-loop hook belongs to no addon and carries no taint. `issecure()` asks the client
+directly whether the bot's scripts are trusted, which is a side-effect-free answer to exactly
+the question that matters.
+
+If it returns `true`, casting through Lua will work and the bot enables it. If it returns
+`false`, or `issecure` does not exist, the bot leaves casting disabled and says so rather
+than attempting it blindly — a refused cast is silent, and a rotation that silently does
+nothing is maddening to debug.
+
+Then target something and confirm the practical answer matches:
 
 ```
 CastSpellByName("Fireball")
 ```
-
-**Expect it to do nothing.** The client refuses protected functions from untrusted callers.
-This is not a bug and it is not something the bot works around — it is why the bot uses
-native calls for anything that acts on the world, and Lua only for asking questions.
 
 ## 3. Click-to-move block (read-only)
 
@@ -132,7 +145,7 @@ report names which address is wrong. Do not loosen the check to get past it.
 
 | Thing | Why |
 | --- | --- |
-| Casting spells | Needs a verified `CastSpell` address. The two sources conflict (0x0080DA40 vs 0x0080B210) and neither has been confirmed, so it is not implemented rather than guessed. |
+| A *native* cast function | The two published `CastSpell` addresses conflict (0x0080DA40 vs 0x0080B210) and neither has been confirmed, so neither is used. Casting goes through Lua instead, gated on the `issecure()` check above. A verified native address would be better, since it does not depend on taint at all. |
 | `Interact` and `TraceLine` | No reachable source gives their addresses for 12340. Interaction will go through click-to-move in phase 3; line of sight needs a real address and is a phase 3 prerequisite. |
 | Movement | Phase 3. The click-to-move writer exists but nothing calls it. |
 | Creature names | Needs the client's own name lookup, which needs an address that is not yet confirmed. |

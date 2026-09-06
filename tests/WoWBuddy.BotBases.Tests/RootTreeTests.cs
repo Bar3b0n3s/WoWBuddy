@@ -1,0 +1,193 @@
+using WoWBuddy.Behavior;
+using WoWBuddy.BotBases;
+using WoWBuddy.Common.Geometry;
+using Xunit;
+
+namespace WoWBuddy.BotBases.Tests;
+
+/// <summary>
+/// Covers the order in which the bot considers things, which is the whole of its judgement.
+/// </summary>
+/// <remarks>
+/// These are the situations that are hardest to stage deliberately in a live client and the
+/// ones where an unattended bot actually goes wrong: dying at the wrong moment, being
+/// attacked while walking somewhere, running out of mana mid-pull.
+/// </remarks>
+public sealed class RootTreeTests
+{
+    private static (BehaviorTree<IBotState> Tree, Recorder Base) BuildWithMarker()
+    {
+        var marker = new Recorder();
+        return (RootTree.Build(marker), marker);
+    }
+
+    /// <summary>A stand-in bot base that records whether it was reached.</summary>
+    private sealed class Recorder : Node<IBotState>
+    {
+        public int Ticks { get; private set; }
+
+        protected override RunStatus OnTick(IBotState context)
+        {
+            Ticks++;
+            return RunStatus.Running;
+        }
+    }
+
+    [Fact]
+    public void NothingRunsWhileTheWorldIsNotLoaded()
+    {
+        // Reading the object manager during a loading screen produces nonsense.
+        (BehaviorTree<IBotState> tree, Recorder botBase) = BuildWithMarker();
+        var state = new FakeBotState { IsInWorld = false };
+
+        Assert.Equal(RunStatus.Running, tree.Tick(state));
+        Assert.Equal(0, botBase.Ticks);
+        Assert.Empty(state.Actions);
+    }
+
+    [Fact]
+    public void DyingPreemptsEverythingElse()
+    {
+        (BehaviorTree<IBotState> tree, Recorder botBase) = BuildWithMarker();
+        var state = new FakeBotState { IsDead = true, IsInCombat = true };
+        state.AddEnemy(1, targetingMe: true);
+
+        tree.Tick(state);
+
+        Assert.Equal(0, botBase.Ticks);
+        Assert.Contains("ReleaseCorpse", state.Actions);
+    }
+
+    [Fact]
+    public void AGhostWalksToItsCorpseAndThenReclaimsIt()
+    {
+        (BehaviorTree<IBotState> tree, _) = BuildWithMarker();
+        var state = new FakeBotState
+        {
+            IsDead = true,
+            IsGhost = true,
+            CorpsePosition = new Vector3(-8500f, 500f, 90f),
+        };
+
+        tree.Tick(state);
+        Assert.Contains("MoveTo", state.Actions);
+
+        // Standing on the corpse now.
+        state.Position = state.CorpsePosition!.Value;
+        state.Actions.Clear();
+        tree.Tick(state);
+
+        Assert.Contains("RetrieveCorpse", state.Actions);
+    }
+
+    [Fact]
+    public void AGhostWithNoKnownCorpseWaitsRatherThanGrinding()
+    {
+        // Falling through to the bot base here would have a ghost trying to pull things.
+        (BehaviorTree<IBotState> tree, Recorder botBase) = BuildWithMarker();
+        var state = new FakeBotState { IsDead = true, IsGhost = true, CorpsePosition = null };
+
+        Assert.Equal(RunStatus.Running, tree.Tick(state));
+        Assert.Equal(0, botBase.Ticks);
+    }
+
+    [Fact]
+    public void CombatPreemptsTheBotBase()
+    {
+        (BehaviorTree<IBotState> tree, Recorder botBase) = BuildWithMarker();
+        var state = new FakeBotState { IsInCombat = true };
+        CandidateTarget enemy = state.AddEnemy(1, targetingMe: true);
+        state.Target = enemy;
+
+        tree.Tick(state);
+
+        Assert.Equal(0, botBase.Ticks);
+        Assert.Contains("Combat", state.RecordingRoutine.Calls);
+    }
+
+    [Fact]
+    public void SomethingAttackingIsTargetedRatherThanIgnored()
+    {
+        // Ignoring an attacker to keep hitting a different mob is how a bot dies with its
+        // target still at ninety per cent.
+        (BehaviorTree<IBotState> tree, _) = BuildWithMarker();
+        var state = new FakeBotState { IsInCombat = true };
+        CandidateTarget attacker = state.AddEnemy(7, targetingMe: true);
+
+        tree.Tick(state);
+
+        Assert.Contains($"SetTarget({attacker.Guid})", state.Actions);
+    }
+
+    [Fact]
+    public void RestingHappensBeforeTheBotBaseStartsAnotherFight()
+    {
+        // A character that pulls at half health dies at a predictable rate.
+        (BehaviorTree<IBotState> tree, Recorder botBase) = BuildWithMarker();
+        var state = new FakeBotState();
+        state.RecordingRoutine.Ready = false;
+        state.RecordingRoutine.RestTicksRemaining = 3;
+
+        tree.Tick(state);
+
+        Assert.Equal(0, botBase.Ticks);
+        Assert.Contains("Rest", state.RecordingRoutine.Calls);
+        Assert.Contains("StartResting", state.Actions);
+    }
+
+    [Fact]
+    public void RestingStopsTheCharacterMovingFirst()
+    {
+        (BehaviorTree<IBotState> tree, _) = BuildWithMarker();
+        var state = new FakeBotState { IsMoving = true };
+        state.RecordingRoutine.Ready = false;
+        state.RecordingRoutine.RestTicksRemaining = 1;
+
+        tree.Tick(state);
+
+        Assert.Contains("StopMoving", state.Actions);
+    }
+
+    [Fact]
+    public void RestingDoesNotHappenDuringAFight()
+    {
+        (BehaviorTree<IBotState> tree, _) = BuildWithMarker();
+        var state = new FakeBotState { IsInCombat = true };
+        state.RecordingRoutine.Ready = false;
+        state.Target = state.AddEnemy(1);
+
+        tree.Tick(state);
+
+        Assert.DoesNotContain("Rest", state.RecordingRoutine.Calls);
+        Assert.Contains("Combat", state.RecordingRoutine.Calls);
+    }
+
+    [Fact]
+    public void TheBotBaseRunsWhenNothingHasGoneWrong()
+    {
+        (BehaviorTree<IBotState> tree, Recorder botBase) = BuildWithMarker();
+
+        tree.Tick(new FakeBotState());
+
+        Assert.Equal(1, botBase.Ticks);
+    }
+
+    [Fact]
+    public void DyingMidFightHandsControlToTheDeathBranchOnTheNextTick()
+    {
+        // The reason the root is a priority selector rather than a sequence: a branch that
+        // becomes relevant takes over rather than waiting for the current one to finish.
+        (BehaviorTree<IBotState> tree, _) = BuildWithMarker();
+        var state = new FakeBotState { IsInCombat = true };
+        state.Target = state.AddEnemy(1);
+
+        tree.Tick(state);
+        Assert.Contains("Combat", state.RecordingRoutine.Calls);
+
+        state.IsDead = true;
+        state.Actions.Clear();
+        tree.Tick(state);
+
+        Assert.Contains("ReleaseCorpse", state.Actions);
+    }
+}

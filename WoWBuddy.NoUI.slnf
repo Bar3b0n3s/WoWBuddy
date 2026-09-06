@@ -2,10 +2,16 @@
   "solution": {
     "path": "WoWBuddy.sln",
     "projects": [
+      "src\\Behavior\\WoWBuddy.Behavior.csproj",
+      "src\\BotBases\\WoWBuddy.BotBases.csproj",
+      "src\\CombatRoutines\\WoWBuddy.CombatRoutines.csproj",
       "src\\Common\\WoWBuddy.Common.csproj",
       "src\\Core\\WoWBuddy.Core.csproj",
       "src\\GameApi\\WoWBuddy.GameApi.csproj",
       "src\\Navigation\\WoWBuddy.Navigation.csproj",
+      "tests\\WoWBuddy.Behavior.Tests\\WoWBuddy.Behavior.Tests.csproj",
+      "tests\\WoWBuddy.BotBases.Tests\\WoWBuddy.BotBases.Tests.csproj",
+      "tests\\WoWBuddy.CombatRoutines.Tests\\WoWBuddy.CombatRoutines.Tests.csproj",
       "tests\\WoWBuddy.Common.Tests\\WoWBuddy.Common.Tests.csproj",
       "tests\\WoWBuddy.Core.Tests\\WoWBuddy.Core.Tests.csproj",
       "tests\\WoWBuddy.Navigation.Tests\\WoWBuddy.Navigation.Tests.csproj",

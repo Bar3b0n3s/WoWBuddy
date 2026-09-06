@@ -10,13 +10,16 @@ namespace WoWBuddy.Core.Execution;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Lua is how the bot <em>asks</em> the client things that are awkward to read from memory:
-/// spell cooldowns, quest text, bag contents, whether a unit is friendly. It is not how the
-/// bot <em>acts</em>. Blizzard's protection makes the interesting verbs — casting, targeting,
-/// moving, using items — refuse to run from untrusted script, and no amount of cleverness in
-/// the Lua layer changes that. Acting goes through native calls instead, which never enter
-/// the taint system at all. Keeping that split explicit is deliberate: a bot that tries to
-/// cast through Lua fails silently and confusingly.
+/// Lua is how the bot asks the client things that are awkward to read from memory: spell
+/// cooldowns, quest text, bag contents, whether a unit is friendly.
+/// <para>
+/// It is also, on this client, how the bot casts. Blizzard's protection refuses the
+/// interesting verbs when they come from <em>addon</em> code, which is tainted; a script run
+/// straight from the render-loop hook belongs to no addon and carries no taint. That is a
+/// property of this build rather than a guarantee, so <c>SpellCaster</c> checks it against
+/// the client before relying on it. Where a verified native address exists, the native route
+/// is preferred, since it does not depend on the question at all.
+/// </para>
 /// </para>
 /// <para>
 /// Return values work by asking Lua to assign a global and then reading the global back

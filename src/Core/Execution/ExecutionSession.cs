@@ -30,12 +30,14 @@ public sealed class ExecutionSession : IDisposable
         GameThreadExecutor executor,
         LuaBridge lua,
         NativeFunctions native,
+        SpellCaster spells,
         ClickToMoveWriter clickToMove,
         VerificationReport report)
     {
         _executor = executor;
         Lua = lua;
         Native = native;
+        Spells = spells;
         ClickToMove = clickToMove;
         Verification = report;
     }
@@ -45,6 +47,12 @@ public sealed class ExecutionSession : IDisposable
 
     /// <summary>Native calls into the client.</summary>
     public NativeFunctions Native { get; }
+
+    /// <summary>
+    /// Spell casting. Only usable once the client has confirmed the bot's scripts are trusted;
+    /// see <see cref="SpellCaster.CanCast"/>.
+    /// </summary>
+    public SpellCaster Spells { get; }
 
     /// <summary>The click-to-move block. Read-only until phase 3.</summary>
     public ClickToMoveWriter ClickToMove { get; }
@@ -111,7 +119,22 @@ public sealed class ExecutionSession : IDisposable
                 return ExecutionInstallResult.Failed(report);
             }
 
-            var session = new ExecutionSession(executor, lua, native, new ClickToMoveWriter(memory), report);
+            var spells = new SpellCaster(lua);
+
+            // Casting is checked but not required. A user who only wants to read the world,
+            // or whose client turns out to refuse protected calls, still gets a working
+            // session; they simply cannot fight with it.
+            if (spells.SelfTest(out string castingDetail))
+            {
+                report.Pass("Spell casting", castingDetail);
+            }
+            else
+            {
+                report.Warn("Spell casting", castingDetail);
+            }
+
+            var session = new ExecutionSession(
+                executor, lua, native, spells, new ClickToMoveWriter(memory), report);
             Log.For<ExecutionSession>().Information("{Report}", report.ToString());
             return ExecutionInstallResult.Succeeded(session);
         }

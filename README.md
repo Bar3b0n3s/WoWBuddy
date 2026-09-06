@@ -17,8 +17,9 @@ The delivery plan runs to eleven phases. Three are done.
 | 1 — Attach and read: memory, offsets, object manager, typed objects, inspector | **Done** |
 | 2 — Execute: game-thread hook, Lua bridge, native calls, Lua console | **Done** |
 | 3 — Move: navigation meshes, path following, stuck handling | **Done** |
-| 4 — Fight: behaviour trees, first combat routines, grind bot base | Next |
-| 5-11 — Loot, bot bases, profiles, plugins, release | Not started |
+| 4 — Fight: behaviour trees, four combat routines, grind bot base | **Done** |
+| 5 — Live: loot, vendor, repair, mail, trainer, gear, scheduler | Next |
+| 6-11 — Gather, quest, dungeons, professions, plugins, release | Not started |
 
 **What works today.** Find a running 12340 client, attach, verify the offset table against
 that specific client, and walk the object manager to read the local player and everything
@@ -29,10 +30,15 @@ It can also load the navigation meshes you extract from your own client — from
 TrinityCore or AzerothCore**, whose formats differ — find paths through them, and walk the
 character along one with stuck detection and recovery.
 
-**What does not.** Combat and everything built on it. Casting is deliberately not
-implemented: the two published addresses for it disagree and neither has been confirmed, so
-it waits for evidence rather than a guess. Mounts and flight paths follow from casting and
-interaction, so they wait too.
+On top of that sits a behaviour tree, four combat routines (Fury Warrior, Frost Mage, Holy
+Priest, Beast Mastery Hunter) and a grind bot base: pick a target, close, pull, fight, rest,
+and recover from dying.
+
+**What does not.** No *native* cast function is used: the two published addresses for it
+disagree and neither has been confirmed. Casting goes through the client's own script entry
+point instead, which existing bots for this build rely on and which the bot verifies against
+your client before using — it asks whether its scripts run in a secure context and stays
+disabled if the answer is no.
 
 **Reading is separate from acting.** Attaching is read-only and cannot destabilise the
 client. Running code inside it is a second, explicit step (`EnableExecution`), so a user who
@@ -52,7 +58,8 @@ See [docs/setup.md](docs/setup.md), then work through
 client, and [docs/phase-2-manual-test.md](docs/phase-2-manual-test.md) before letting
 anything run inside it. For movement, [docs/navigation-data.md](docs/navigation-data.md)
 covers extracting navigation data and [docs/phase-3-manual-test.md](docs/phase-3-manual-test.md)
-covers confirming click-to-move before anything writes to it.
+covers confirming click-to-move before anything writes to it, and
+[docs/phase-4-manual-test.md](docs/phase-4-manual-test.md) covers combat.
 
 ## How this project handles low-level facts
 
@@ -97,6 +104,9 @@ src/Core         Offsets, memory, process attach, object manager, verification,
                  game-thread execution (x86 codegen, EndScene hook, Lua bridge)
 src/GameApi      Typed model: WoWUnit, WoWPlayer, WoWGameObject
 src/Navigation   Navigation mesh loading, pathfinding, movement, stuck handling
+src/Behavior     Behaviour tree engine
+src/CombatRoutines  Rotation engine and per-specialisation routines
+src/BotBases     Root behaviour tree and the grind base
 src/UI           WPF shell
 tools/Inspector  Read-only console dev tool
 tests/           Unit tests, including a simulated client

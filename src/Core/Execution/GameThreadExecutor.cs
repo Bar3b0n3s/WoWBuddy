@@ -18,13 +18,22 @@ namespace WoWBuddy.Core.Execution;
 /// frame, and the answer comes back through the same block.
 /// </para>
 /// <para>
-/// <b>On the protected-function problem.</b> WoW refuses to let addon Lua call things like
-/// <c>CastSpellByName</c> or <c>TargetUnit</c> when the call originated from untrusted code.
-/// That protection lives in the Lua layer: it tracks taint across the script VM. The C
-/// functions those Lua bindings wrap have no such notion, and neither does the render loop.
-/// Calling them from here is therefore not a workaround for taint so much as a route that
-/// never enters the taint system at all. It is also why the bot does not try to execute
-/// protected Lua and never will: Lua is for reading state, native calls are for acting.
+/// <b>On the protected-function problem.</b> The client refuses to let <em>addon</em> Lua call
+/// things like <c>CastSpellByName</c> or <c>TargetUnit</c>: it tracks taint through the script
+/// VM, and code belonging to an addon is tainted. Two routes get past that, and the bot uses
+/// both.
+/// </para>
+/// <para>
+/// Native calls are one: the C functions those Lua bindings wrap have no notion of taint, and
+/// neither does the render loop, so calling them from here never enters the taint system at
+/// all. The other is that a script handed straight to the client's own script entry point from
+/// this hook has no addon associated with it, and so carries no taint either. That is what
+/// existing bots for this client rely on to cast.
+/// </para>
+/// <para>
+/// The second route is a property of one build rather than a guarantee, so it is checked
+/// rather than assumed: <c>SpellCaster.SelfTest</c> asks the client whether the bot's scripts
+/// are secure, and casting stays disabled until it says yes.
 /// </para>
 /// <para>
 /// <b>Failure is latching.</b> If a call is not picked up within its deadline, the executor
