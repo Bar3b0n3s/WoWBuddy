@@ -64,6 +64,16 @@ public sealed record BotSettings
     /// <summary>The recipe it makes, or empty for whatever raises the skill fastest.</summary>
     public string CraftRecipe { get; init; } = string.Empty;
 
+    /// <summary>
+    /// Whether to get back into the world after a dropped connection.
+    /// </summary>
+    /// <remarks>
+    /// Not a login, and needs no password: a disconnection leaves the client at character
+    /// select with the last character still chosen. A client at the login screen needs a
+    /// person, and the bot says so rather than trying.
+    /// </remarks>
+    public bool Reconnect { get; init; } = true;
+
     /// <summary>What to do when a person whispers the character.</summary>
     /// <remarks>
     /// Pausing by default. A character that keeps killing boars while a game master asks it a

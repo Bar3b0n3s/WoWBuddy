@@ -123,8 +123,11 @@ public sealed class BotRunner
             if (!_state.IsInWorld)
             {
                 // A loading screen, a character select, a disconnection. Every reading taken
-                // from an empty object manager would be about nobody.
+                // from an empty object manager would be about nobody — but one of those three
+                // is worth acting on, and telling them apart is a matter of how long it lasts.
                 _wasInWorld = false;
+                _state.WhileOutOfWorld(now);
+
                 return LastOutcome = TickOutcome.NotInWorld;
             }
 

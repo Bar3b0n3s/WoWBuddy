@@ -79,4 +79,7 @@ public enum StopReason
 
     /// <summary>Someone whispered the character.</summary>
     Whispered,
+
+    /// <summary>The character fell out of the world and could not be got back in.</summary>
+    Disconnected,
 }

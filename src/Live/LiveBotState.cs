@@ -53,6 +53,8 @@ public sealed class LiveBotState : IBotState, IProfileConditionContext
     private readonly LuaTrainer _trainer;
     private readonly LuaWhispers? _whispers;
     private readonly WhisperWatch? _watch;
+    private readonly LuaWorldEntry? _entry;
+    private readonly ReconnectWatch? _reconnect;
     private readonly LuaTalents _talents;
     private readonly LuaTravel _travel;
     private readonly SessionScheduler _session;
@@ -79,7 +81,9 @@ public sealed class LiveBotState : IBotState, IProfileConditionContext
         ICombatContext combat,
         Func<DateTimeOffset>? clock = null,
         LuaWhispers? whispers = null,
-        WhisperWatch? watch = null)
+        WhisperWatch? watch = null,
+        LuaWorldEntry? entry = null,
+        ReconnectWatch? reconnect = null)
     {
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
         Now = _clock();
@@ -98,6 +102,9 @@ public sealed class LiveBotState : IBotState, IProfileConditionContext
         // and throw the whispers away, which is worse than not listening at all.
         _whispers = watch is null ? null : whispers;
         _watch = whispers is null ? null : watch;
+
+        _entry = reconnect is null ? null : entry;
+        _reconnect = entry is null ? null : reconnect;
         _talents = talents ?? throw new ArgumentNullException(nameof(talents));
         _travel = travel ?? throw new ArgumentNullException(nameof(travel));
         _session = session ?? throw new ArgumentNullException(nameof(session));
@@ -398,6 +405,8 @@ public sealed class LiveBotState : IBotState, IProfileConditionContext
     /// </remarks>
     public SessionState UpdateSession(DateTimeOffset now)
     {
+        _reconnect?.Back();
+
         if (_whispers is not null && _watch is not null)
         {
             _watch.Consider(_whispers, _session, now);
@@ -408,6 +417,24 @@ public sealed class LiveBotState : IBotState, IProfileConditionContext
 
     /// <summary>What has been said to the character, for the window.</summary>
     public WhisperWatch? Whispers => _watch;
+
+    /// <summary>How the bot is getting back into the world, when it is out of it.</summary>
+    public ReconnectWatch? Reconnect => _reconnect;
+
+    /// <summary>
+    /// Called on a tick where the character is not in the world.
+    /// </summary>
+    /// <remarks>
+    /// The one thing worth doing while out of the world, and the only thing the bot does there:
+    /// everything else it could read belongs to nobody until a character is loaded.
+    /// </remarks>
+    public void WhileOutOfWorld(DateTimeOffset now)
+    {
+        if (_entry is not null && _reconnect is not null)
+        {
+            _reconnect.WhileAway(_entry, _session, now);
+        }
+    }
 
     /// <summary>Throws away every cached reading, for when the world has changed underneath.</summary>
     /// <remarks>

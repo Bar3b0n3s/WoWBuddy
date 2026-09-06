@@ -31,6 +31,11 @@ loader and a Honorbuddy importer; loot rules, gear evaluation and errand plannin
 scheduler with randomised breaks; group play — following, assisting, role-aware behaviour,
 group healing; plugins.
 
+**Getting back in after a dropped connection.** No credentials, and none stored: a disconnection
+leaves the client at character select with the last character still chosen, and entering the
+world from there needs no secret. A client at the login screen needs a person, and the bot stops
+and says so.
+
 **Noticing when it is spoken to.** A frame inside the client listens for whispers; the bot
 drains it every tick and stands the character still — or stops for good, if you would rather.
 It never replies.
@@ -97,7 +102,10 @@ The window asks, keeps the answer, and never guesses:
 
 Settings live beside the executable and hold nothing that could log a character in. This project
 makes no network calls, and storing an account password to be typed into a game client is a
-promise it is not in a position to keep safely.
+promise it is not in a position to keep safely. The original brief for this project asked for
+auto-login with credentials kept under Windows DPAPI; it was considered and declined, and what
+was built instead is the half that needs no secret — see **Getting back in** above. That covers
+the ordinary disconnection, which is what an unattended session actually loses time to.
 
 ### Hostility is exact with faction data, approximate without
 

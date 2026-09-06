@@ -21,6 +21,14 @@ zero, anything may change.
   `Objective` step that names no creature works from the quest's own requirements instead of
   killing whatever is nearest, and a `Collect` step can be finished by the bags without reading
   log text in a language the bot cannot parse. What the profile says always wins.
+- **It gets back in after a dropped connection, without storing anything.** A disconnection
+  leaves the client at character select with the last character still chosen, so entering the
+  world from there needs no secret at all. It waits half a minute first, because a loading
+  screen looks identical for the first few seconds; it tries a few times and then stops with a
+  reason, because something clicking at a screen for six hours is worse than something that gave
+  up; and at a login screen it stops immediately and says a person is needed. The original brief
+  asked for full auto-login with DPAPI-encrypted credentials — that was considered and declined,
+  and this is what was built instead.
 - **The bot stops when a person speaks to it.** A small frame inside the client listens for
   whispers and the bot drains it every tick, standing the character still for ten minutes by
   default — or stopping for good, or doing nothing, as you choose — with an ignore list so a

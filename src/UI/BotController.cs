@@ -491,7 +491,14 @@ public sealed class BotController(
             // unattended session that plays through a game master's question is the failure
             // this whole project is most exposed to. What it does about one is a setting.
             new LuaWhispers(lua, _capabilities!),
-            new WhisperWatch(_settings.ResolveWhispers()));
+            new WhisperWatch(_settings.ResolveWhispers()),
+
+            // Getting back in after a dropped connection. No credentials are involved and none
+            // are stored: this is the half of logging in that needs no secret, because a
+            // disconnection leaves the client at character select rather than at the login
+            // screen. A client that is at the login screen needs a person, and says so.
+            new LuaWorldEntry(lua),
+            new ReconnectWatch(new ReconnectSettings { Enabled = _settings.Reconnect }));
     }
 
     /// <summary>

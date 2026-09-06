@@ -127,7 +127,8 @@ public sealed class EndToEndTests
         Node<IBotState>? botBase = null,
         IReadOnlyList<ProfileVendor>? errands = null,
         SessionSchedule? schedule = null,
-        WhisperSettings? whispers = null)
+        WhisperSettings? whispers = null,
+        ReconnectSettings? reconnect = null)
     {
         FakeLua lua = FakeLua.Typical335a();
         CapabilityReport capabilities = CapabilityProbes.Probe(lua);
@@ -155,7 +156,9 @@ public sealed class EndToEndTests
             new StubCombat(),
             () => Now,
             new LuaWhispers(lua, capabilities, () => Now),
-            new WhisperWatch(whispers ?? new WhisperSettings()));
+            new WhisperWatch(whispers ?? new WhisperSettings()),
+            new LuaWorldEntry(lua),
+            new ReconnectWatch(reconnect ?? new ReconnectSettings()));
 
         Counter counter = new();
 
@@ -334,6 +337,55 @@ public sealed class EndToEndTests
         rig.Runner.Tick(Now);
 
         Assert.Equal(SessionState.Running, rig.State.Session);
+        Assert.Equal(1, rig.BotBase.Ticks);
+    }
+
+    [Fact]
+    public void ADroppedConnectionGetsTheCharacterBackInWithoutAPassword()
+    {
+        // The half of logging in that needs no secret. This project stores no credentials and
+        // will not: a disconnection leaves the client at character select with the last
+        // character still chosen, and getting back from there is one call.
+        Rig rig = Build(reconnect: new ReconnectSettings { WaitBefore = TimeSpan.FromSeconds(30) });
+
+        rig.View.IsInWorld = false;
+        rig.Lua.With("EnterWorld");
+
+        // A loading screen looks the same for the first few seconds, and is left alone.
+        Assert.Equal(TickOutcome.NotInWorld, rig.Runner.Tick(Now));
+        Assert.DoesNotContain("execute: EnterWorld()", rig.Lua.Asked);
+
+        Assert.Equal(TickOutcome.NotInWorld, rig.Runner.Tick(Now.AddSeconds(31)));
+        Assert.Contains("execute: EnterWorld()", rig.Lua.Asked);
+        Assert.Equal(1, rig.State.Reconnect?.Attempts);
+    }
+
+    [Fact]
+    public void ALoginScreenStopsTheSessionRatherThanBeingPokedAt()
+    {
+        Rig rig = Build(reconnect: new ReconnectSettings { WaitBefore = TimeSpan.Zero });
+
+        rig.View.IsInWorld = false;
+
+        rig.Runner.Tick(Now);
+
+        // No EnterWorld to call means the login screen, which needs a person.
+        Assert.Equal(SessionState.Stopped, rig.State.Session);
+    }
+
+    [Fact]
+    public void ComingBackClearsTheCountAndThePlayingResumes()
+    {
+        Rig rig = Build(reconnect: new ReconnectSettings { WaitBefore = TimeSpan.Zero });
+
+        rig.View.IsInWorld = false;
+        rig.Lua.With("EnterWorld");
+        rig.Runner.Tick(Now);
+
+        rig.View.IsInWorld = true;
+
+        Assert.Equal(TickOutcome.Ran, rig.Runner.Tick(Now.AddSeconds(5)));
+        Assert.Equal(0, rig.State.Reconnect?.Attempts);
         Assert.Equal(1, rig.BotBase.Ticks);
     }
 

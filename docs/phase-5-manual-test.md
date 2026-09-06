@@ -134,6 +134,27 @@ another character whisper it.
 If it does not react at all, check the capability report for `Whispers`: without `CreateFrame`
 the bot cannot listen, and it says so at attach rather than pretending.
 
+## 5c. A dropped connection
+
+The bot handles the half of logging in that needs no password. With it running, force a
+disconnection — pull the network cable, or `/console reloadui` will not do it, so kill the
+connection at the router or use the server's own disconnect if you run one.
+
+1. **Expect nothing to happen for the first half-minute.** A loading screen and a zone change
+   look exactly like a disconnection until enough time has passed, and entering the world during
+   one would be wasted at best.
+2. **Expect the character to come back in** as whoever was last played.
+3. Log the client out to the character-select screen by hand and watch it come back the same way.
+4. Now log out to the **login** screen. **Expect the bot to stop, with `Disconnected` as the
+   reason**, and to say that a person is needed. It stores no credentials and cannot answer a
+   login screen; a bot clicking at one all night would be worse than one that stopped.
+
+If step 2 does nothing at all, the likely cause is the one recorded in `LuaWorldEntry`: 3.3.5a
+runs the glue screens in a separate Lua state, and this project has no record of whether
+`FrameScript_Execute` reaches it. Run `type(EnterWorld)` through the inspector's `lua` command
+while the character-select screen is showing and report what you see — that single answer closes
+the question.
+
 ## 6. The scheduler
 
 Set a short work interval and break length to watch it without waiting ninety minutes.
