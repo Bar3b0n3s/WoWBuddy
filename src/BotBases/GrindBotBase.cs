@@ -35,6 +35,15 @@ public sealed class GrindSettings
     /// </remarks>
     public IReadOnlySet<uint> AvoidEntries { get; init; } = new HashSet<uint>();
 
+    /// <summary>
+    /// What to leave alone on the strength of the server's own tables.
+    /// </summary>
+    /// <remarks>
+    /// Elites and anything far above the character. Without world data exported this knows
+    /// nothing and rejects nothing, which leaves the bot exactly where it was.
+    /// </remarks>
+    public TargetFilter Filter { get; init; } = new();
+
     /// <summary>Places never to walk into, as a centre and a radius.</summary>
     public IReadOnlyList<(Vector3 Centre, float Radius)> Blackspots { get; init; } = [];
 
@@ -96,6 +105,8 @@ public sealed class GrindBotBase
         return state.NearbyEnemies
             .Where(candidate => candidate.Distance <= _settings.SearchRadius)
             .Where(_settings.IsAcceptable)
+            .Where(candidate => !_settings.Filter.ShouldAvoid(
+                candidate.Entry, candidate.Level, state.Level))
             .Where(candidate => !candidate.IsInCombat || candidate.IsTargetingMe)
             .OrderBy(candidate => candidate.Distance)
             .Select(candidate => (CandidateTarget?)candidate)

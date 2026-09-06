@@ -16,6 +16,7 @@ using WoWBuddy.Navigation.Movement;
 using WoWBuddy.CombatRoutines;
 using WoWBuddy.Presentation;
 using WoWBuddy.Profiles;
+using WoWBuddy.WorldData;
 
 namespace WoWBuddy.UI;
 
@@ -51,6 +52,7 @@ public sealed class BotController(BotSettings? settings = null) : IBotController
     private MovementController? _movement;
     private SpellCaster? _caster;
     private LuaTradeSkills? _tradeSkills;
+    private WorldDataSet? _worldData;
     private int _ticking;
 
     /// <inheritdoc />
@@ -215,10 +217,14 @@ public sealed class BotController(BotSettings? settings = null) : IBotController
             return $"There is no combat routine called '{routine}'.";
         }
 
+        // Exported once per session: the tables do not change while the game is running.
+        _worldData ??= LoadWorldData();
+
         BotBaseBuild built = BotBaseFactory.Create(
             botBase,
             profile,
             tradeSkills: _tradeSkills,
+            world: _worldData,
             crafting: new CraftSettings
             {
                 Profession = _settings.CraftProfession,
@@ -280,6 +286,26 @@ public sealed class BotController(BotSettings? settings = null) : IBotController
         _timer = new Timer(_ => Tick(), null, TimeSpan.Zero, TimeSpan.FromMilliseconds(250));
 
         return built.Message;
+    }
+
+    /// <summary>
+    /// Reads whatever the user exported from their server database.
+    /// </summary>
+    /// <remarks>
+    /// Missing files are not an error. Every part of the bot that uses world data checks for
+    /// what it needs and says so if it is absent, rather than the whole thing refusing to run.
+    /// </remarks>
+    private static WorldDataSet LoadWorldData()
+    {
+        WorldDataSet world = new();
+
+        foreach (string problem in world.LoadFrom(
+            Path.Combine(AppContext.BaseDirectory, "worlddata")))
+        {
+            Log.For<BotController>().Warning("{Problem}", problem);
+        }
+
+        return world;
     }
 
     /// <summary>Builds the live picture of the client from the pieces that read it.</summary>

@@ -81,6 +81,16 @@ promise it is not in a position to keep safely.
 
 ### Hostility is guessed at
 
+Faction is now in the export, so the raw material is there — but turning a faction template id
+into "hostile to me" needs `FactionTemplate.dbc`, which is client data rather than database
+data. Extracting it is the same job as extracting the navigation meshes, and reading it is not
+written yet.
+
+What the export does close is the more expensive half of the problem: elites, bosses and level
+ranges. Those were what actually killed unattended characters.
+
+### The old hostility approximation
+
 Whether a creature is an enemy needs its faction template, and resolving one needs a data file
 this project does not ship. `HostilityRule` excludes players, anything wearing NPC flags, and
 unselectable or pacified units, then treats the rest as fair game. It will offer a neutral

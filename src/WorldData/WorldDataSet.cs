@@ -21,6 +21,7 @@ public sealed class WorldDataSet
     private readonly Dictionary<int, List<CreatureSpawn>> _creaturesByMap = [];
     private readonly Dictionary<uint, GameObjectTemplate> _gameObjectTemplates = [];
     private readonly Dictionary<uint, CreatureTemplate> _creatureTemplates = [];
+    private readonly Dictionary<uint, ItemTemplate> _itemTemplates = [];
 
     /// <summary>Standard file names produced by the export scripts.</summary>
     public static class FileNames
@@ -32,6 +33,9 @@ public sealed class WorldDataSet
         public const string CreatureSpawns = "creature-spawns.tsv";
 
         public const string CreatureTemplates = "creature-templates.tsv";
+
+        /// <summary>Every item, for deciding about loot before picking it up.</summary>
+        public const string ItemTemplates = "item-templates.tsv";
     }
 
     /// <summary>Game object spawns, by map.</summary>
@@ -114,13 +118,37 @@ public sealed class WorldDataSet
             return result;
         });
 
+        LoadFile(directory, FileNames.ItemTemplates, problems, reader =>
+        {
+            var templates = new List<ItemTemplate>();
+            WorldDataReadResult result = WorldDataReader.ReadItemTemplates(reader, templates);
+            foreach (ItemTemplate template in templates)
+            {
+                _itemTemplates[template.Entry] = template;
+            }
+
+            return result;
+        });
+
         Log.For<WorldDataSet>().Information(
             "World data loaded: {GameObjects} object spawns, {Creatures} creature spawns, " +
-            "{ObjectTemplates} object templates, {CreatureTemplates} service creatures",
-            GameObjectSpawnCount, CreatureSpawnCount, GameObjectTemplateCount, CreatureTemplateCount);
+            "{ObjectTemplates} object templates, {CreatureTemplates} creatures, {Items} items",
+            GameObjectSpawnCount, CreatureSpawnCount, GameObjectTemplateCount,
+            CreatureTemplateCount, ItemTemplateCount);
 
         return problems;
     }
+
+    /// <summary>How many items were exported.</summary>
+    public int ItemTemplateCount => _itemTemplates.Count;
+
+    /// <summary>What a creature is, if it was exported.</summary>
+    public CreatureTemplate? CreatureFor(uint entry) =>
+        _creatureTemplates.TryGetValue(entry, out CreatureTemplate template) ? template : null;
+
+    /// <summary>What an item is, if it was exported.</summary>
+    public ItemTemplate? ItemFor(uint entry) =>
+        _itemTemplates.TryGetValue(entry, out ItemTemplate template) ? template : null;
 
     /// <summary>The template for a game object entry, if it was exported.</summary>
     public GameObjectTemplate? TemplateFor(uint entry) =>

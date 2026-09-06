@@ -31,6 +31,12 @@ zero, anything may change.
 
 ### Added
 
+- **The bot can tell an elite from an ordinary mob.** The world data export now carries
+  `creature_template`'s rank, faction and level range, and the grind base leaves elites, bosses
+  and anything far above the character alone. Rank is not in a unit's descriptors, so without
+  the export the bot found this out by dying.
+- **Item templates in the export**, so a loot decision can be made about an item before it is
+  picked up rather than after.
 - **Raid groups.** Read from the raid unit ids when there are any, with the character skipped
   because raid units include it and party units do not.
 - **Mounts.** The character gets on for a long journey and off for combat, looting, skinning

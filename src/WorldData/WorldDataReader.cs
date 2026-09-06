@@ -133,6 +133,12 @@ public static class WorldDataReader
     }
 
     /// <summary>Reads creature templates and their service flags.</summary>
+    /// <remarks>
+    /// Only the first three columns are required. Faction, level range and rank were added
+    /// later and are read when the file has them, so an export taken before they existed still
+    /// loads — it simply says less about each creature. Re-exporting is worth it: rank is what
+    /// tells the bot an elite from an ordinary mob, and nothing it can see in memory does.
+    /// </remarks>
     public static WorldDataReadResult ReadCreatureTemplates(
         TextReader reader, ICollection<CreatureTemplate> into)
     {
@@ -146,10 +152,72 @@ public static class WorldDataReader
                 return false;
             }
 
-            into.Add(new CreatureTemplate(entry, fields[1], flags));
+            into.Add(new CreatureTemplate(
+                entry,
+                fields[1],
+                flags,
+                Optional(fields, 3, out uint faction) ? faction : 0,
+                OptionalInt(fields, 4),
+                OptionalInt(fields, 5),
+                OptionalInt(fields, 6)));
+
             return true;
         });
     }
+
+    /// <summary>Reads item templates.</summary>
+    /// <remarks>
+    /// The whole table, because a loot decision is about an item the character is not carrying
+    /// yet and so could be about any of them. It is the largest of the exports and still only a
+    /// few megabytes.
+    /// </remarks>
+    public static WorldDataReadResult ReadItemTemplates(
+        TextReader reader, ICollection<ItemTemplate> into)
+    {
+        ArgumentNullException.ThrowIfNull(reader);
+        ArgumentNullException.ThrowIfNull(into);
+
+        string[] columns =
+        [
+            "entry", "name", "quality", "itemlevel", "requiredlevel",
+            "class", "subclass", "inventorytype", "sellprice", "stackable",
+        ];
+
+        return Read(reader, columns, fields =>
+        {
+            if (!TryUInt(fields[0], out uint entry))
+            {
+                return false;
+            }
+
+            into.Add(new ItemTemplate(
+                entry,
+                fields[1],
+                OptionalInt(fields, 2),
+                OptionalInt(fields, 3),
+                OptionalInt(fields, 4),
+                OptionalInt(fields, 5),
+                OptionalInt(fields, 6),
+                OptionalInt(fields, 7),
+                OptionalInt(fields, 8),
+                OptionalInt(fields, 9)));
+
+            return true;
+        });
+    }
+
+    /// <summary>Reads a column that a file may not have, treating anything unreadable as zero.</summary>
+    private static bool Optional(string[] fields, int index, out uint value)
+    {
+        value = 0;
+        return index < fields.Length && TryUInt(fields[index], out value);
+    }
+
+    private static int OptionalInt(string[] fields, int index) =>
+        index < fields.Length
+        && int.TryParse(fields[index], NumberStyles.Integer, CultureInfo.InvariantCulture, out int value)
+            ? value
+            : 0;
 
     private static WorldDataReadResult Read(
         TextReader reader,

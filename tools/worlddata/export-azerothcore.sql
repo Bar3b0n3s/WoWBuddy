@@ -31,8 +31,28 @@ SELECT guid, id1, map, position_x, position_y, position_z
 FROM creature;
 
 -- creature-templates.tsv
-SELECT 'entry', 'name', 'npcflag'
+--
+-- The whole table now, not just the service NPCs. Rank is the reason: it is what tells the bot
+-- an elite from an ordinary mob, and nothing it can read out of memory does. A grinding
+-- character that pulls an elite of its own level dies, every time, and only the database knows
+-- which is which before the fight starts.
+--
+-- The first three columns are what older WoWBuddy builds expect, so this file stays readable by
+-- them; the rest are ignored by anything that does not know about them.
+SELECT 'entry', 'name', 'npcflag', 'faction', 'minlevel', 'maxlevel', 'rank'
 UNION ALL
-SELECT entry, REPLACE(REPLACE(name, '\t', ' '), '\n', ' '), npcflag
-FROM creature_template
-WHERE npcflag & (0x80 | 0x1000 | 0x2000 | 0x10000 | 0x20000 | 0x10 | 0x20 | 0x40) <> 0;
+SELECT entry, REPLACE(REPLACE(name, '\t', ' '), '\n', ' '),
+       npcflag, faction, minlevel, maxlevel, rank
+FROM creature_template;
+
+-- item-templates.tsv
+--
+-- The whole table, because a loot decision is about an item the character is not carrying yet
+-- and so could be about any of them. A few megabytes.
+SELECT 'entry', 'name', 'quality', 'itemlevel', 'requiredlevel',
+       'class', 'subclass', 'inventorytype', 'sellprice', 'stackable'
+UNION ALL
+SELECT entry, REPLACE(REPLACE(name, '\t', ' '), '\n', ' '),
+       Quality, ItemLevel, RequiredLevel,
+       class, subclass, InventoryType, SellPrice, stackable
+FROM item_template;

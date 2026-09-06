@@ -52,8 +52,30 @@ public readonly record struct CreatureSpawn(uint Guid, uint Entry, int MapId, Ve
 /// <param name="Entry">The template id.</param>
 /// <param name="Name">Its name.</param>
 /// <param name="NpcFlags">Its service flags, matching the client's own NPC flag bits.</param>
-public readonly record struct CreatureTemplate(uint Entry, string Name, uint NpcFlags)
+public readonly record struct CreatureTemplate(
+    uint Entry,
+    string Name,
+    uint NpcFlags,
+    uint Faction = 0,
+    int MinLevel = 0,
+    int MaxLevel = 0,
+    int Rank = 0)
 {
+    /// <summary>Ordinary. Most things a grinding character kills.</summary>
+    public const int NormalRank = 0;
+
+    /// <summary>Elite. Built to be fought by a group.</summary>
+    public const int EliteRank = 1;
+
+    /// <summary>Rare elite.</summary>
+    public const int RareEliteRank = 2;
+
+    /// <summary>Boss.</summary>
+    public const int BossRank = 3;
+
+    /// <summary>Rare, but not elite.</summary>
+    public const int RareRank = 4;
+
     // The bits the bot cares about. Values are the 3.3.5 protocol's own, the same ones the
     // client reports in a unit's descriptor, which is what lets a creature found in the
     // database be recognised again in the object manager.
@@ -81,6 +103,68 @@ public readonly record struct CreatureTemplate(uint Entry, string Name, uint Npc
 
     /// <summary>True when this creature is a banker.</summary>
     public bool IsBanker => (NpcFlags & BankerFlag) != 0;
+
+    /// <summary>
+    /// True when this creature is built to be fought by a group.
+    /// </summary>
+    /// <remarks>
+    /// The single most useful thing the database says about a creature. An elite kills a
+    /// solo character of its own level, and nothing the bot can see in memory distinguishes
+    /// one from an ordinary mob until the fight is already going badly.
+    /// </remarks>
+    public bool IsElite => Rank is EliteRank or RareEliteRank or BossRank;
+
+    /// <summary>True when this creature is a boss.</summary>
+    public bool IsBoss => Rank == BossRank;
+
+    /// <summary>True when it is worth more than the usual, elite or not.</summary>
+    public bool IsRare => Rank is RareRank or RareEliteRank;
+
+    /// <summary>True when the level range is known.</summary>
+    public bool HasLevels => MinLevel > 0 && MaxLevel >= MinLevel;
+}
+
+/// <summary>
+/// What an item is, from the server's own table.
+/// </summary>
+/// <remarks>
+/// The bot can ask the client the same questions, but only about items it is carrying and only
+/// one round trip at a time. Having the table means a loot decision can be made before the
+/// item is picked up rather than after.
+/// </remarks>
+/// <param name="Entry">Its id.</param>
+/// <param name="Name">What it is called.</param>
+/// <param name="Quality">Grey through legendary, as the client numbers them.</param>
+/// <param name="ItemLevel">Its item level.</param>
+/// <param name="RequiredLevel">The level needed to use it.</param>
+/// <param name="Class">Its class: weapon, armour, consumable, trade goods, quest.</param>
+/// <param name="SubClass">Its subclass within that.</param>
+/// <param name="InventoryType">Where it is worn, or zero when it is not worn.</param>
+/// <param name="SellPrice">What a vendor pays, in copper. Zero means a vendor will not take it.</param>
+/// <param name="Stackable">How many fit in one slot.</param>
+public readonly record struct ItemTemplate(
+    uint Entry,
+    string Name,
+    int Quality,
+    int ItemLevel,
+    int RequiredLevel,
+    int Class,
+    int SubClass,
+    int InventoryType,
+    int SellPrice,
+    int Stackable)
+{
+    /// <summary>The item class the server uses for quest items.</summary>
+    public const int QuestClass = 12;
+
+    /// <summary>True when a vendor will pay anything for it.</summary>
+    public bool IsSellable => SellPrice > 0;
+
+    /// <summary>True when it belongs to a quest and must not be thrown away or sold.</summary>
+    public bool IsQuestItem => Class == QuestClass;
+
+    /// <summary>True when it can be worn or wielded.</summary>
+    public bool IsEquippable => InventoryType != 0;
 }
 
 /// <summary>A creature spawn together with what it does, which is what an errand needs.</summary>

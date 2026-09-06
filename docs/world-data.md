@@ -112,3 +112,34 @@ The export comes from your database, which you installed to run your server. Not
 is committed here. TrinityCore and AzerothCore are GPL projects used as external tools whose
 output the bot consumes — the same arrangement as the map extractors, and the same one set
 out in [legal-and-licensing.md](legal-and-licensing.md).
+
+## What the tables buy that memory cannot
+
+Most of what the bot needs it reads out of the client. Three things it cannot:
+
+**Whether a creature is an elite.** This is the big one. Rank is not in a unit's descriptors, so
+from memory an elite looks exactly like an ordinary mob of the same level — the bot finds out by
+pulling it and dying, and an unattended session that does that at two in the morning is over.
+The database knows before the fight starts, and `creature_template.rank` is the whole answer.
+
+**What a creature's level range is.** The client says what the unit in front of the character
+is; the export says what that spawn point can roll. A level-eight boar with a level-nine sibling
+behind it matters when the character is level nine.
+
+**What an item is before you pick it up.** `GetItemInfo` answers only about items already in the
+bags, one round trip at a time. The export answers about any item, which is what a loot decision
+actually needs.
+
+Without the export the bot still runs — the target filter rejects nothing it cannot look up,
+because refusing everything unknown would stop a bot that had been working perfectly well. It
+just plays worse, and the status line says so.
+
+## Public dumps, for users without a server
+
+The export scripts run against any TrinityCore or AzerothCore world database, including one
+imported from the SQL dumps both projects publish with their releases. You do not need to run a
+server: importing the dump into a local MySQL, running the export, and throwing the database
+away is enough, and the resulting TSV files are a few megabytes.
+
+Nothing derived from those dumps is committed here, for the same reason no navigation mesh is:
+it is Blizzard's data, and TrinityCore and AzerothCore are GPL-licensed besides.

@@ -70,13 +70,14 @@ public static class BotBaseFactory
         IReadOnlyDictionary<string, Node<IBotState>>? behaviors = null,
         FishingHooks? fishing = null,
         ITradeSkills? tradeSkills = null,
-        CraftSettings? crafting = null)
+        CraftSettings? crafting = null,
+        WorldDataSet? world = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
         return name.ToUpperInvariant() switch
         {
-            "GRIND" => Grind(profile),
+            "GRIND" => Grind(profile, world),
             "GATHER" => Gather(profile, memory),
             "FISH" => Fish(profile, fishing),
             "QUESTING" => Questing(profile, behaviors),
@@ -87,20 +88,31 @@ public static class BotBaseFactory
         };
     }
 
-    private static BotBaseBuild Grind(Profile? profile)
+    private static BotBaseBuild Grind(Profile? profile, WorldDataSet? world = null)
     {
+        // With world data the bot knows an elite before it pulls one; without it, it finds out
+        // by dying. Everything else about grinding works either way.
+        TargetFilter filter = world is { CreatureTemplateCount: > 0 }
+            ? new TargetFilter(new TargetFilterSettings(), world.CreatureFor)
+            : new TargetFilter();
+
         GrindSettings settings = new()
         {
             Hotspots = Places(profile),
             AvoidEntries = profile?.AvoidMobs ?? new HashSet<uint>(),
             Blackspots = Blackspots(profile),
+            Filter = filter,
         };
+
+        string where = settings.Hotspots.Count > 0
+            ? $"Grinding {settings.Hotspots.Count} spot(s)."
+            : "Grinding where the character stands. Give it a profile to patrol an area.";
 
         return new BotBaseBuild(
             new GrindBotBase(settings).Build(),
-            settings.Hotspots.Count > 0
-                ? $"Grinding {settings.Hotspots.Count} spot(s)."
-                : "Grinding where the character stands. Give it a profile to patrol an area.");
+            filter.HasData
+                ? where
+                : where + " No world data, so it cannot tell an elite from an ordinary mob.");
     }
 
     private static BotBaseBuild Gather(Profile? profile, WorldMemory? memory)
