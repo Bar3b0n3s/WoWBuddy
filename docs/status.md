@@ -31,6 +31,9 @@ loader and a Honorbuddy importer; loot rules, gear evaluation and errand plannin
 scheduler with randomised breaks; group play — following, assisting, role-aware behaviour,
 group healing; plugins.
 
+**Keeping what it learns.** Every vendor, mailbox and node the character walks past is written
+down and read back next session, one map per realm and character.
+
 **Using a world data export.** Where the herbs and vendors are, which creatures are elites,
 which trainer teaches which class, who sells a given item, and what each quest actually asks
 for. Everything that depends on it degrades to how the bot behaved before it existed, and the

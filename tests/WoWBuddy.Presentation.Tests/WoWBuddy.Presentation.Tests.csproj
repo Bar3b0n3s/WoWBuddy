@@ -8,6 +8,9 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Presentation\WoWBuddy.Presentation.csproj" />
+    <!-- For FakeBotState, so a tree the factory built can actually be ticked. A factory that
+         returns a node nobody runs is how an argument goes missing unnoticed. -->
+    <ProjectReference Include="..\WoWBuddy.BotBases.Tests\WoWBuddy.BotBases.Tests.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />

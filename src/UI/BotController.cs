@@ -14,6 +14,8 @@ using WoWBuddy.Live;
 using WoWBuddy.Navigation;
 using WoWBuddy.Navigation.Movement;
 using WoWBuddy.CombatRoutines;
+using WoWBuddy.Common.Configuration;
+using WoWBuddy.Plugins;
 using WoWBuddy.Presentation;
 using WoWBuddy.Profiles;
 using WoWBuddy.WorldData;
@@ -26,23 +28,46 @@ namespace WoWBuddy.UI;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Attaching, verifying the offset table and reading the character are real and work today.
-/// Starting is not, and this class says so rather than appearing to run.
+/// The composition root. Everything else in this project is written against interfaces and
+/// tested against fakes of them; this is the one place where the real client, the user's
+/// settings, their world data, their plugins and the behaviour tree are put together, and so
+/// the one place where a thing can be built correctly and then never handed to anything.
 /// </para>
 /// <para>
-/// <b>What is missing is the live <see cref="IBotState"/>.</b> Everything above this line —
-/// six bot bases, thirty combat routines, the behaviour tree, profiles, group play — is written
-/// against that interface and tested against a fake implementation of it. Nothing yet implements
-/// it against a running client: doing so means reading the quest log, the party, the bags and
-/// the battleground queue out of a real 3.3.5a client, and most of that is Lua this project has
-/// not verified. It is the next piece of work, and it is deliberately not faked here. A start
-/// button that ticked a tree fed on invented values would look like progress and be worth less
-/// than nothing.
+/// That failure has happened here before and leaves no trace: a setting the window collects and
+/// nothing reads looks exactly like a setting that works. Every argument below is passed
+/// deliberately, and the ones that are conditional say why.
+/// </para>
+/// <para>
+/// <b>None of it has run against a real 3.3.5a client.</b> The Lua it depends on is probed for
+/// existence at attach and checked by hand in the manual test scripts; see
+/// <c>docs/status.md</c>.
 /// </para>
 /// </remarks>
-public sealed class BotController(BotSettings? settings = null) : IBotController
+public sealed class BotController(
+    BotSettings? settings = null,
+    PluginManager? plugins = null,
+    ConfigStore? config = null) : IBotController
 {
+    /// <summary>What the learned map is saved as, inside the character's settings folder.</summary>
+    public const string WorldMapFileName = "worldmap";
+
     private readonly BotSettings _settings = settings ?? new BotSettings();
+
+    /// <summary>
+    /// The plugins the application loaded, or null when it loaded none.
+    /// </summary>
+    /// <remarks>
+    /// Held here rather than reached for later because plugins do two separate things for a
+    /// running bot — they offer behaviours a profile's steps can name, and they want a tick —
+    /// and both have to be arranged before the tree is built.
+    /// </remarks>
+    private readonly PluginManager? _plugins = plugins;
+
+    private readonly ConfigStore _config = config ?? new ConfigStore();
+
+    private WorldMemory? _memory;
+    private string _memoryPath = string.Empty;
 
     private GameClient? _client;
     private World? _world;
@@ -175,6 +200,12 @@ public sealed class BotController(BotSettings? settings = null) : IBotController
         ClientCapabilities = string.Empty;
         _caster = null;
         _tradeSkills = null;
+
+        // Forgotten, not kept: the next attach may be a different character, and handing one
+        // character's map to another is exactly the mistake keeping them separate avoids.
+        _memory = null;
+        _memoryPath = string.Empty;
+
         _world = null;
         _client?.Dispose();
         _client = null;
@@ -221,10 +252,23 @@ public sealed class BotController(BotSettings? settings = null) : IBotController
 
         // Exported once per session: the tables do not change while the game is running.
         _worldData ??= LoadWorldData();
+        _memory ??= LoadWorldMap(execution.Lua);
 
         BotBaseBuild built = BotBaseFactory.Create(
             botBase,
             profile,
+            // What the bot learned about this character's world on previous runs. Without it
+            // the gather base starts every session blind and throws away what it finds.
+            memory: _memory,
+
+            // The window asks for this because the bot will not guess it, and a bot wrong about
+            // it tanks in cloth. Not passing it made the dungeon base refuse to start at all.
+            role: _settings.Role,
+
+            // Behaviours the loaded plugins offer, so a profile's CustomBehavior steps can find
+            // them. Without this every such step is reported missing and skipped.
+            behaviors: _plugins?.Behaviors(),
+
             tradeSkills: _tradeSkills,
             world: _worldData,
             crafting: new CraftSettings
@@ -288,7 +332,12 @@ public sealed class BotController(BotSettings? settings = null) : IBotController
                     Enabled = _settings.MountName.Length > 0,
                     WorthMountingFor = _settings.MountForJourneysOver,
                 })
-            .Root);
+            .Root,
+
+            // Plugins get a tick of their own, after the tree has had its. Passed as a delegate
+            // because the runner lives in a project that does not know plugins exist.
+            pulsePlugins: _plugins is null ? null : _plugins.Pulse);
+
         _runner.Start();
 
         // A tick every quarter second. Faster buys nothing — the client's own update rate is
@@ -306,6 +355,51 @@ public sealed class BotController(BotSettings? settings = null) : IBotController
     /// Missing files are not an error. Every part of the bot that uses world data checks for
     /// what it needs and says so if it is absent, rather than the whole thing refusing to run.
     /// </remarks>
+    /// <summary>
+    /// Loads what this character learned about the world on previous runs.
+    /// </summary>
+    /// <remarks>
+    /// One map per realm and character. A private server's world is not necessarily another's,
+    /// and one shared file would teach the bot to walk to vendors that are not there. Stale
+    /// entries are dropped on the way in: a node that has not been seen for a month is more
+    /// likely to have been a mistake than to still be there.
+    /// </remarks>
+    private WorldMemory LoadWorldMap(ILuaEvaluator lua)
+    {
+        _memoryPath = _config.PathFor(WorldMapFileName, Character(lua));
+
+        WorldMemory memory = WorldMemory.Load(_memoryPath);
+        memory.Forget(DateTimeOffset.UtcNow);
+
+        return memory;
+    }
+
+    /// <summary>Writes the learned map back, when there is anything new in it.</summary>
+    private void SaveWorldMap()
+    {
+        if (_memory is { IsDirty: true } memory && _memoryPath.Length > 0)
+        {
+            memory.Save(_memoryPath);
+        }
+    }
+
+    /// <summary>
+    /// Which character this is, for scoping its settings and its map.
+    /// </summary>
+    /// <remarks>
+    /// The name comes out of the object manager; the realm is the one thing here that needs the
+    /// client's scripting, and a client that cannot answer leaves it blank — which
+    /// <see cref="CharacterKey"/> renders as "unknown" rather than failing.
+    /// </remarks>
+    private CharacterKey Character(ILuaEvaluator lua)
+    {
+        string realm = _capabilities?.Supports(GameCapability.Realm) == true
+            ? lua.Evaluate("GetRealmName()") ?? string.Empty
+            : string.Empty;
+
+        return new CharacterKey(realm, _world?.Me?.Name ?? string.Empty);
+    }
+
     private static WorldDataSet LoadWorldData()
     {
         WorldDataSet world = new();
@@ -435,5 +529,9 @@ public sealed class BotController(BotSettings? settings = null) : IBotController
         _runner = null;
         _tree = null;
         _movement = null;
+
+        // Here rather than on a timer: a session's learning is worth keeping, and this is the
+        // point at which the bot is definitely not in the middle of writing to it.
+        SaveWorldMap();
     }
 }

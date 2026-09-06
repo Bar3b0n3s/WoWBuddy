@@ -39,9 +39,27 @@ zero, anything may change.
   gives a rotation what it needs, and `BotRunner` ticks the tree with movement advanced first.
   The Start button composes all of it.
 
+### Fixed
+
+- **Three things the window collected and the bot never received.** The composition root built
+  every bot base without the chosen group role, without the learned world map, and without the
+  behaviours plugins offer — so the Dungeon base refused to start however the role was set,
+  gathering relearned the same nodes every session, and a profile's `CustomBehavior` steps were
+  all reported missing. Plugins were loaded, listed in the window and never given a tick either.
+  All four are now passed, and the factory's handling of each is pinned by a test that ticks the
+  tree it returns.
+- **The learned map is actually saved.** `WorldMemory` could load and save itself and nothing
+  called either, so a session's learning died with the process. It is now read on start and
+  written on stop, detach, or closing the window — one file per realm and character, in the
+  settings folder, with entries older than a month dropped on the way in.
+
 ### Changed
 
 - `IVendorActions` gained `MerchantStock` and `Buy`; `ITradeSkills` gained `ReagentsFor`.
+- `BotController` takes the plugin manager and the config store. It is the composition root, and
+  the things it failed to pass on were all things it was never given.
+- One more capability probe, `Realm`, for the single call used to tell one server's world from
+  another's when naming the map file.
 - The walk-to-a-vendor-and-open-its-window step is now `VendorApproach`, shared by the errand
   handler and the supply run rather than written twice.
 

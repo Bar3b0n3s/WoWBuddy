@@ -143,6 +143,16 @@ public static class CapabilityProbes
             ["IsUsableSpell", "CastSpellByName", "Dismount"],
             "getting on and off a mount",
             "The character walks everywhere, which is slower and never wrong."),
+
+        // Only ever used to name a file. It earns a probe anyway, because every Lua call this
+        // project makes is listed here and a call that quietly is not would be the exception
+        // nobody remembers.
+        new(GameCapability.Realm,
+            ["GetRealmName"],
+            "telling one server's world from another's",
+            "The learned map is kept per character name alone, so two characters with the same "
+            + "name on different servers would share one — and be taught to walk to places that "
+            + "are not there."),
     ];
 
     /// <summary>Asks the client about every capability.</summary>

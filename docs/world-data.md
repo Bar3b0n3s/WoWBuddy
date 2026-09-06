@@ -13,6 +13,15 @@ The map lives in your settings folder, one per realm and character — a private
 is not necessarily the same as another's, and sharing one file would teach the bot to walk to
 places that are not there. It is a plain JSON file you can read, edit or delete.
 
+It is read when the bot starts and written when it stops or detaches, and closing the window
+counts as detaching. Entries not seen for a month are dropped on the way in: a node that has
+not been there for that long is more likely to have been a mistake than to still be there.
+
+The realm half of the name comes from the client, through the one Lua call this project makes
+purely to name a file. A client that cannot answer leaves it as "unknown", and then two
+characters with the same name on different servers would share a map — worth knowing if you
+play the same name in two places.
+
 Nothing on this page is required. Everything below is an optional shortcut for the minority
 of users who happen to have a server database.
 

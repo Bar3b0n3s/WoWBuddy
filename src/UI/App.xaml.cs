@@ -21,6 +21,7 @@ namespace WoWBuddy.UI;
 public partial class App : Application
 {
     private PluginManager? _plugins;
+    private BotController? _controller;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -71,9 +72,15 @@ public partial class App : Application
         ConfigStore config = new();
         BotSettings settings = config.Load<BotSettings>(BotSettings.FileName) ?? new BotSettings();
 
+        // The controller gets the plugins and the config store: it needs the first for the
+        // behaviours a profile can name and the tick they expect, and the second so the map a
+        // character learns is saved beside that character's settings.
+        BotController controller = new(settings, _plugins, config);
+        _controller = controller;
+
         MainViewModel model = new(
             new WowClientDiscovery(),
-            new BotController(settings),
+            controller,
             routines,
             _plugins,
             config);
@@ -90,6 +97,11 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        // Before the plugins, and before the log closes: this stops the bot, writes the learned
+        // map back, and removes the hook from the client. Closing the window mid-run would
+        // otherwise leave the character standing and the session's learning thrown away.
+        _controller?.Detach();
+
         _plugins?.Shutdown();
 
         Log.For<App>().Information("WoWBuddy exiting");

@@ -1,5 +1,6 @@
 using WoWBuddy.Behavior;
 using WoWBuddy.BotBases;
+using WoWBuddy.BotBases.Tests;
 using WoWBuddy.BotBases.Group;
 using WoWBuddy.BotBases.Support;
 using WoWBuddy.Common.Geometry;
@@ -286,6 +287,69 @@ public sealed class BotBaseFactoryTests
 
         Assert.True(built.Success);
         Assert.DoesNotContain("No quest data", built.Message, StringComparison.Ordinal);
+    }
+
+
+    // ---- what the composition root has to pass ---------------------------------------------
+
+    [Fact]
+    public void TheGatherBaseLearnsIntoTheMapItWasGiven()
+    {
+        // The failure this pins down leaves no trace: a map loaded at start-up and not passed
+        // here looks exactly like one that works, and the bot relearns the same nodes every
+        // session and throws them away at the end of it.
+        WorldMemory memory = new();
+
+        BotBaseBuild built = BotBaseFactory.Create(
+            "Gather",
+            WithSteps(new ProfileStep(StepKind.Objective, Entry: 1617, Position: Somewhere)),
+            memory);
+
+        FakeBotState state = new() { Position = Somewhere };
+        state.AddVisible(1, entry: 1617, distance: 20f);
+
+        built.Tree!.Tick(state);
+
+        Assert.Equal(1, memory.Count);
+    }
+
+    [Fact]
+    public void AProfilesCustomBehaviorStepFindsABehaviourItWasGiven()
+    {
+        // Same class of failure: without the behaviours, every CustomBehavior step is reported
+        // missing and skipped, and the profile quietly does less than it says.
+        bool ran = false;
+
+        Dictionary<string, Node<IBotState>> behaviors = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Greet"] = new Do<IBotState>(_ =>
+            {
+                ran = true;
+                return RunStatus.Success;
+            }),
+        };
+
+        BotBaseBuild built = BotBaseFactory.Create(
+            "Questing",
+            WithSteps(new ProfileStep(StepKind.CustomBehavior, BehaviorName: "Greet")),
+            behaviors: behaviors);
+
+        built.Tree!.Tick(new FakeBotState());
+
+        Assert.True(ran);
+    }
+
+    [Fact]
+    public void ACustomBehaviorNobodyOffersIsSkippedRatherThanFatal()
+    {
+        // An imported profile mentioning behaviours this bot does not have still runs the rest
+        // of its steps.
+        BotBaseBuild built = BotBaseFactory.Create(
+            "Questing",
+            WithSteps(new ProfileStep(StepKind.CustomBehavior, BehaviorName: "Greet")));
+
+        Assert.True(built.Success);
+        Assert.Equal(RunStatus.Failure, built.Tree!.Tick(new FakeBotState()));
     }
 
     [Fact]

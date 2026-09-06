@@ -158,6 +158,16 @@ With a plan whose posts you wrote from your own client's coordinates:
    runner to the other end of the map while its objective changes hands is the classic failure.
 5. At the end, **expect it to leave and queue again**.
 
+## 9. The role reaches the dungeon base
+
+A short one, because it is the check that would have caught a real bug: the window collected a
+role and the bot was never given it, so the Dungeon base refused to start whatever you chose.
+
+1. Choose a role in the window.
+2. Choose the Dungeon base and press Start.
+3. **Expect the status line to name the role you chose**, not "Choose a role before running the
+   dungeon base".
+
 ## What is still unverified after this script
 
 - Every battleground Lua call in section 7, until you have run it.

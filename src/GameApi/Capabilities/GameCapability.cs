@@ -59,6 +59,9 @@ public enum GameCapability
 
     /// <summary>Getting on and off a mount.</summary>
     Travel,
+
+    /// <summary>Which server the character is on.</summary>
+    Realm,
 }
 
 /// <summary>One thing to ask the client about itself.</summary>
