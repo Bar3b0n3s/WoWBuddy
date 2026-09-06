@@ -73,6 +73,38 @@ bot considers what to do next. `HandleGroupSupport` fills that gap, and reports 
 when the routine acted, so that a damage character still reaches the bot base that picks it
 something to assist with. Resting is also now blocked while anyone in the group is fighting.
 
+## Battlegrounds
+
+The battleground base queues, accepts the port, goes to the places its plan names, clicks the
+flags it finds there, fights what it meets, and leaves when the match ends.
+
+**Stated plainly: it fights and moves and does not get thrown out for standing still. It does
+not play Warsong Gulch well.** It has no idea which team holds what, it does not call incoming,
+it will not decide the flag carrier needs help, and it cannot tell a defended base from an empty
+one. Everything it knows about a battleground is a list of places worth being, in order,
+supplied by you.
+
+That is a deliberate stopping point rather than an unfinished one. Real battleground play is
+per-battleground logic driven by the score and objective state, and pretending to have it would
+produce a bot that looks competent for thirty seconds.
+
+Two things in it are worth more than they look:
+
+- **Flags generalise.** Capturing a base, taking a flag and returning one are all "walk to a
+  thing and click it", so a post with a game object entry covers all of them in every
+  battleground without a line of per-battleground scripting.
+- **The leash.** The classic battleground bot failure is chasing one runner to the other end of
+  the map while the objective it was standing on changes hands behind it. The bot will not
+  chase past `ChaseRange` from its current post.
+
+Plans come from a profile — `BattlegroundPlan.FromProfile` reads every step that names a place —
+so there is one file format for users rather than a second one invented for battlegrounds.
+Battleground layouts are game data, so no plan ships with this project.
+
+The Lua behind queueing is **not verified**. Section 7 of
+[phase-8-manual-test.md](phase-8-manual-test.md) is how to check it, and it is the first thing
+to run before trusting any of this.
+
 ## What is deliberately not here
 
 **Boss encounters.** Every fight worth scripting is scripted differently, and the data that

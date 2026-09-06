@@ -1,4 +1,5 @@
 using WoWBuddy.Behavior;
+using WoWBuddy.BotBases.Battlegrounds;
 using WoWBuddy.BotBases.Group;
 using WoWBuddy.BotBases.Questing;
 using WoWBuddy.BotBases;
@@ -252,6 +253,11 @@ public sealed class FakeBotState : IBotState
 
     public IPartyState Party => PartyState;
 
+    /// <summary>The battleground queue.</summary>
+    public FakeBattlegrounds BattlegroundState { get; } = new();
+
+    public IBattlegroundActions Battlegrounds => BattlegroundState;
+
     /// <summary>Places a creature or object the client can see.</summary>
     public VisibleObject AddVisible(ulong guid, uint entry, float distance = 10f, bool hasPosition = true)
     {
@@ -286,12 +292,13 @@ public sealed class FakeBotState : IBotState
         bool alive = true,
         bool inCombat = false,
         bool targetingMe = false,
-        uint entry = 299)
+        uint entry = 299,
+        double healthPercent = 100d)
     {
         var candidate = new CandidateTarget(
             new WoWGuid(guid | ((ulong)WoWGuidType.Creature << 48)),
             new Vector3(Position.X + distance, Position.Y, Position.Z),
-            distance, level, 100d, alive, inCombat, targetingMe, entry);
+            distance, level, healthPercent, alive, inCombat, targetingMe, entry);
 
         NearbyEnemies = [.. NearbyEnemies, candidate];
         return candidate;
