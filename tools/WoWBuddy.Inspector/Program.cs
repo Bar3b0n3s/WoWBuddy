@@ -9,6 +9,8 @@ using WoWBuddy.Core.Objects;
 using WoWBuddy.Core.Offsets;
 using WoWBuddy.GameApi;
 using WoWBuddy.GameApi.Objects;
+using WoWBuddy.Navigation;
+using WoWBuddy.Navigation.Data;
 
 namespace WoWBuddy.Inspector;
 
@@ -50,6 +52,7 @@ public static class Program
                 "exec" => ExecSelfTest(args),
                 "lua" => LuaConsole(args),
                 "ctm" => ReadClickToMove(args),
+                "nav" => CheckNavigationData(args),
                 "help" or "--help" or "-h" => ShowHelp(),
                 _ => ShowUnknownCommand(command),
             };
@@ -81,6 +84,10 @@ public static class Program
               exec [pid]        Install game-thread execution, run the self-tests, remove it.
               lua [pid]         Interactive Lua console.
               ctm [pid]         Watch the click-to-move block. Read-only.
+
+            Navigation data (phase 3). Needs no client:
+              nav <mmaps-dir> [mapId...]
+                                Check navigation data you extracted yourself.
 
               help              Show this text.
 
@@ -369,6 +376,85 @@ public static class Program
 
         return 0;
     }
+
+    /// <summary>
+    /// Checks a folder of extracted navigation data and says what is in it.
+    /// </summary>
+    /// <remarks>
+    /// Needs no game client, because the commonest navigation problem is the data rather than
+    /// the bot: a partial extraction, the wrong continent, or files from both server projects
+    /// mixed together. Finding that out should not require logging in.
+    /// </remarks>
+    private static int CheckNavigationData(string[] args)
+    {
+        if (args.Length < 2)
+        {
+            Console.Error.WriteLine("Usage: nav <mmaps-directory> [mapId ...]");
+            Console.Error.WriteLine("Defaults to the four 3.3.5a continents when no map ids are given.");
+            return 2;
+        }
+
+        string directory = args[1];
+        if (!Directory.Exists(directory))
+        {
+            Console.Error.WriteLine($"No such directory: {directory}");
+            return 1;
+        }
+
+        // Eastern Kingdoms, Kalimdor, Outland, Northrend.
+        int[] maps = args.Length > 2
+            ? args[2..].Select(a => int.TryParse(a, CultureInfo.InvariantCulture, out int id) ? id : -1)
+                       .Where(id => id >= 0).ToArray()
+            : [0, 1, 530, 571];
+
+        Console.WriteLine($"Navigation data in {directory}");
+        Console.WriteLine();
+
+        var loader = new NavMeshLoader(directory);
+        int usable = 0;
+
+        foreach (int mapId in maps)
+        {
+            NavMeshLoadResult result = loader.Load(mapId);
+            string name = MapName(mapId);
+
+            if (result.Success)
+            {
+                usable++;
+                Console.WriteLine(
+                    $"  [ok    ] map {mapId,3} {name,-18} {result.TilesLoaded,5} tiles, {result.Flavour} data" +
+                    (result.TilesRejected > 0 ? $", {result.TilesRejected} rejected" : string.Empty));
+            }
+            else
+            {
+                Console.WriteLine($"  [FAILED] map {mapId,3} {name,-18} unusable");
+            }
+
+            foreach (string problem in result.Problems.Take(5))
+            {
+                Console.WriteLine($"             {problem}");
+            }
+
+            if (result.Problems.Count > 5)
+            {
+                Console.WriteLine($"             ... and {result.Problems.Count - 5} more");
+            }
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"{usable} of {maps.Length} map(s) usable.");
+        Console.WriteLine("See docs/navigation-data.md if anything above failed.");
+        return usable > 0 ? 0 : 1;
+    }
+
+    private static string MapName(int mapId) => mapId switch
+    {
+        0 => "Eastern Kingdoms",
+        1 => "Kalimdor",
+        530 => "Outland",
+        571 => "Northrend",
+        _ => string.Empty,
+    };
 
     private static void PrintLocalPlayer(WoWLocalPlayer? me)
     {

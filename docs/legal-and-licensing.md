@@ -30,8 +30,12 @@ specified the fallback, which is what the project follows:
 2. **AmeisenNavigation cannot be vendored either.** It can still be used the same way the
    brief already permits for the map extractors: as a **separate external program** the user
    installs and runs themselves, which WoWBuddy talks to over localhost. Data crossing a
-   process boundary is not a derivative work. This decision is deferred to phase 3, where the
-   alternative is a permissively licensed Recast/Detour server of our own.
+   process boundary is not a derivative work. **This turned out not to be needed.** Phase 3
+   uses [DotRecast](https://github.com/ikpil/DotRecast), a zlib-licensed C# port of
+   Recast/Detour, in-process. Its NuGet package carries no licence expression, so it was
+   checked against `LICENSE.txt` in the repository: the zlib licence, with the original
+   Recast copyright plus the porters'. That removes the separate navigation server entirely,
+   along with the licence problem that made it awkward.
 3. **Offset *values* are a different matter.** A memory offset is a measurement of someone
    else's binary. Facts are not copyrightable; the source code that records them is. So the
    values in `Offsets335a.cs` are treated as facts, gathered from multiple sources,
@@ -49,6 +53,7 @@ Only MIT, BSD, Apache-2.0 and zlib licensed packages may be referenced. Current 
 | Package | Licence |
 | --- | --- |
 | Serilog, Serilog.Sinks.Console, Serilog.Sinks.File | Apache-2.0 |
+| DotRecast.Detour, DotRecast.Core | zlib |
 | xunit, xunit.runner.visualstudio (test only) | Apache-2.0 |
 | Microsoft.NET.Test.Sdk (test only) | MIT |
 

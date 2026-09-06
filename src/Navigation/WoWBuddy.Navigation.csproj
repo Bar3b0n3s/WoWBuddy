@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RootNamespace>WoWBuddy.Navigation</RootNamespace>
+    <AssemblyName>WoWBuddy.Navigation</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Common\WoWBuddy.Common.csproj" />
+    <ProjectReference Include="..\Core\WoWBuddy.Core.csproj" />
+    <ProjectReference Include="..\GameApi\WoWBuddy.GameApi.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- zlib licensed, same as the Recast/Detour it ports. See docs/legal-and-licensing.md. -->
+    <PackageReference Include="DotRecast.Detour" />
+    <PackageReference Include="Serilog" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="WoWBuddy.Navigation.Tests" />
+  </ItemGroup>
+
+</Project>

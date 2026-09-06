@@ -29,6 +29,12 @@ Microsoft.CodeCoverage
 Microsoft.TestPlatform.ObjectModel
 Microsoft.TestPlatform.TestHost
 
+# DotRecast - zlib. A C# port of Recast/Detour; the NuGet package carries no licence
+# expression, so this was checked against LICENSE.txt in the ikpil/DotRecast repository,
+# which is the zlib licence with the original Recast copyright plus the porters'.
+DotRecast.Detour
+DotRecast.Core
+
 # Transitive dependencies of the above - MIT (Microsoft) / Apache-2.0.
 Microsoft.Extensions.ObjectPool
 NuGet.Frameworks

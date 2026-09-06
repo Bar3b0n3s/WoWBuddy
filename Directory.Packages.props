@@ -17,6 +17,14 @@
     <PackageVersion Include="Serilog.Sinks.File" Version="6.0.0" />
     <!-- Microsoft.Extensions.*: MIT -->
     <PackageVersion Include="Microsoft.Extensions.ObjectPool" Version="8.0.11" />
+    <!--
+      DotRecast: a C# port of Recast/Detour, zlib licensed like the original. Used to read
+      the navigation meshes the user extracts from their own client and to query paths in
+      them. Being permissive is what makes it usable here: the obvious alternative,
+      AmeisenNavigation, is GPL-3.0 and could not be linked into an MIT program.
+    -->
+    <PackageVersion Include="DotRecast.Detour" Version="2026.3.1" />
+    <PackageVersion Include="DotRecast.Core" Version="2026.3.1" />
   </ItemGroup>
 
   <ItemGroup>

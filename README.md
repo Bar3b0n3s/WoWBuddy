@@ -16,17 +16,23 @@ The delivery plan runs to eleven phases. Three are done.
 | 0 — Scaffold, CI, licensing, docs | **Done** |
 | 1 — Attach and read: memory, offsets, object manager, typed objects, inspector | **Done** |
 | 2 — Execute: game-thread hook, Lua bridge, native calls, Lua console | **Done** |
-| 3 — Move: nav server, path following, stuck handling, mounts | Next |
-| 4-11 — Combat, bot bases, profiles, plugins, release | Not started |
+| 3 — Move: navigation meshes, path following, stuck handling | **Done** |
+| 4 — Fight: behaviour trees, first combat routines, grind bot base | Next |
+| 5-11 — Loot, bot bases, profiles, plugins, release | Not started |
 
 **What works today.** Find a running 12340 client, attach, verify the offset table against
 that specific client, and walk the object manager to read the local player and everything
 around it. Then, optionally, install a hook on the client's render loop and run code on its
 own thread: execute Lua and read values back, and call the client's native functions.
 
-**What does not.** Movement, combat, and everything built on them. Casting is deliberately
-not implemented: the two published addresses for it disagree and neither has been confirmed,
-so it waits for evidence rather than a guess.
+It can also load the navigation meshes you extract from your own client — from **either
+TrinityCore or AzerothCore**, whose formats differ — find paths through them, and walk the
+character along one with stuck detection and recovery.
+
+**What does not.** Combat and everything built on it. Casting is deliberately not
+implemented: the two published addresses for it disagree and neither has been confirmed, so
+it waits for evidence rather than a guess. Mounts and flight paths follow from casting and
+interaction, so they wait too.
 
 **Reading is separate from acting.** Attaching is read-only and cannot destabilise the
 client. Running code inside it is a second, explicit step (`EnableExecution`), so a user who
@@ -44,7 +50,9 @@ dotnet run --project tools/WoWBuddy.Inspector -c Release -- inspect
 See [docs/setup.md](docs/setup.md), then work through
 [docs/phase-1-manual-test.md](docs/phase-1-manual-test.md) to confirm the offsets match your
 client, and [docs/phase-2-manual-test.md](docs/phase-2-manual-test.md) before letting
-anything run inside it.
+anything run inside it. For movement, [docs/navigation-data.md](docs/navigation-data.md)
+covers extracting navigation data and [docs/phase-3-manual-test.md](docs/phase-3-manual-test.md)
+covers confirming click-to-move before anything writes to it.
 
 ## How this project handles low-level facts
 
@@ -88,6 +96,7 @@ src/Common       Logging, configuration, geometry
 src/Core         Offsets, memory, process attach, object manager, verification,
                  game-thread execution (x86 codegen, EndScene hook, Lua bridge)
 src/GameApi      Typed model: WoWUnit, WoWPlayer, WoWGameObject
+src/Navigation   Navigation mesh loading, pathfinding, movement, stuck handling
 src/UI           WPF shell
 tools/Inspector  Read-only console dev tool
 tests/           Unit tests, including a simulated client

@@ -1,19 +1,23 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
-    <RootNamespace>WoWBuddy.Inspector</RootNamespace>
-    <AssemblyName>WoWBuddy.Inspector</AssemblyName>
-    <!-- Attaches to the 32-bit client, so the host process is built x86. -->
-    <WoWBuddyClientHost>true</WoWBuddyClientHost>
+    <RootNamespace>WoWBuddy.Navigation.Tests</RootNamespace>
+    <AssemblyName>WoWBuddy.Navigation.Tests</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Common\WoWBuddy.Common.csproj" />
     <ProjectReference Include="..\..\src\Core\WoWBuddy.Core.csproj" />
-    <ProjectReference Include="..\..\src\GameApi\WoWBuddy.GameApi.csproj" />
     <ProjectReference Include="..\..\src\Navigation\WoWBuddy.Navigation.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
   </ItemGroup>
 
 </Project>
