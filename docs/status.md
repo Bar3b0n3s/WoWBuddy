@@ -37,28 +37,23 @@ place to start, and the only thing in the project that is useful today without f
 
 ## What does not work
 
-### The live state adapter is missing
+### The live state adapter exists; the view behind it is not yet proven
 
-Every bot base and combat routine is written against `IBotState` and tested against a fake. Four
-adapters that read a real client now exist:
+`LiveBotState` now implements `IBotState` against a real client, and `BotRunner` drives the
+behaviour tree with it. The composition is done and tested:
 
-| Adapter | Reads |
-| --- | --- |
-| `LuaQuestLog` | the quest log, its objectives, and accepting and handing in |
-| `LuaPartyState` | group membership, health, targets; positions from the object manager |
-| `LuaBattlegrounds` | the queue, the match state, joining and leaving |
-| `LuaInventory` | bag space, gear wear, money, item counts, using an item |
+| Half | Source | Confidence |
+| --- | --- | --- |
+| Position, health, target, nearby units, level, visible objects | offsets, via `ICharacterView` | verified against your client at attach time |
+| Quest log, party, battleground queue, bags | Lua, via four adapters | calls checked for existence; behaviour assumed |
+| Paths and walking | navigation meshes and click-to-move | verified, and gated behind an explicit enable |
 
-What does not exist is the class that composes those with the memory-derived state — position,
-health, target, nearby units — and drives the behaviour tree on a timer.
+**What is left is `WorldCharacterView`** — the thin class that answers `ICharacterView` from a
+live `World` and the native call wrappers. Everything above it is exercised by 126 tests against
+a fake view; that one class is the remaining unwritten piece, and it is deliberately small
+enough to read in one sitting once written.
 
-**The consequence is visible in the UI.** Start validates your choices, builds the tree, catches
-a profile that does not give its bot base what it needs, and then says plainly that it cannot
-play it. That is deliberate. A start button that ticked a tree fed on invented values would look
-like progress and be worth less than nothing.
-
-It also means `IPlugin.Pulse` is a contract nothing calls yet. A plugin that ships a combat
-routine works today; one that does per-tick work does not.
+Until it exists the Start button still refuses, and says so.
 
 ### No crafting bot base
 

@@ -9,6 +9,7 @@
     <ProjectReference Include="..\Common\WoWBuddy.Common.csproj" />
     <ProjectReference Include="..\Core\WoWBuddy.Core.csproj" />
     <ProjectReference Include="..\GameApi\WoWBuddy.GameApi.csproj" />
+    <ProjectReference Include="..\Navigation\WoWBuddy.Navigation.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Serilog" />
