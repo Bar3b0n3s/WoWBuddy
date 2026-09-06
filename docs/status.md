@@ -5,9 +5,9 @@ believe; anything cheerier elsewhere is out of date.
 
 ## In one sentence
 
-WoWBuddy can read a 3.3.5a client thoroughly and run code inside it safely, and everything that
-decides what a bot should do is written and tested — but nothing yet joins those two halves, so
-it cannot play unattended.
+WoWBuddy is complete end to end — it attaches, verifies itself against your client, reads the
+world, decides what to do and ticks a behaviour tree that acts on it — and not one line of that
+has ever run against a real 3.3.5a client.
 
 ## What works today
 
@@ -37,34 +37,38 @@ place to start, and the only thing in the project that is useful today without f
 
 ## What does not work
 
-### The live state adapter exists; the view behind it is not yet proven
+### None of it has run against a real client
 
-`LiveBotState` now implements `IBotState` against a real client, and `BotRunner` drives the
-behaviour tree with it. The composition is done and tested:
+**That is now the whole of the gap.** Every piece exists and is wired: attaching, verifying the
+offsets, installing the hook, proving Lua, probing what the client supports, reading the world
+into `IBotState`, building a tree from a bot base and a profile, and ticking it four times a
+second with the character's movement advanced first.
 
-| Half | Source | Confidence |
-| --- | --- | --- |
-| Position, health, target, nearby units, level, visible objects | offsets, via `ICharacterView` | verified against your client at attach time |
-| Quest log, party, battleground queue, bags | Lua, via four adapters | calls checked for existence; behaviour assumed |
-| Paths and walking | navigation meshes and click-to-move | verified, and gated behind an explicit enable |
+What has never happened is any of it running against a 3.3.5a client, because this project has
+never had access to one. The unit tests — 808 of them — check the bot against this project's own
+understanding of the client, which is exactly the thing that could be wrong.
 
-`WorldCharacterView` answers `ICharacterView` from a live `World`, and is deliberately the
-thinnest file in the project: every member is a read through the verified offset table or a call
-through the execution layer, with no judgement in it beyond turning game objects into plain
-values.
+Specifically unproven:
 
-**The one judgement it does make is hostility, and it is an approximation.** Whether a creature
-is an enemy is decided by its faction template, and resolving one needs a data file this project
-does not ship. `HostilityRule` instead excludes what can be ruled out — players, anything
-wearing NPC flags, unselectable and pacified units — and leaves the rest to the profile's avoid
-list. It will occasionally offer a neutral critter as a target. A user who has faction data can
-supply a better rule; the view takes one.
+| Piece | Rests on |
+| --- | --- |
+| `WorldCharacterView` | the Lua verbs `RepopMe`, `RetrieveCorpse`, `InteractUnit`, `LootSlot`, `SitStandOrDescendStart` |
+| `LiveCombatContext` | `GetSpellCooldown`, `IsUsableSpell`, `UnitAura`, `CastSpellByName` with a unit id |
+| `LuaQuestLog` | `GetQuestLogTitle`'s seventh return, and `GetQuestLink`'s hyperlink format |
+| `LuaBattlegrounds` | the queueing indices, and `GetBattlefieldInstanceRunTime` as a started signal |
+| Hostility | an approximation with no faction data behind it at all |
 
-**What has never happened is any of it running against a real client.** The composition above
-the view has 139 tests behind it; the view itself is client interaction and cannot be tested
-away from a game. Every Lua verb in it — `RepopMe`, `RetrieveCorpse`, `InteractUnit`,
-`LootSlot`, `SitStandOrDescendStart` — is written from the shape of the 3.3.5a API and has not
-been watched working.
+**Run the manual test scripts.** They exist for this, they are ordered so each one only needs
+what the last one proved, and reporting what you saw is the most useful thing anyone can do for
+this project right now.
+
+### Hostility is guessed at
+
+Whether a creature is an enemy needs its faction template, and resolving one needs a data file
+this project does not ship. `HostilityRule` excludes players, anything wearing NPC flags, and
+unselectable or pacified units, then treats the rest as fair game. It will offer a neutral
+critter as a target. A profile's avoid list is the intended cover, and a user with faction data
+can supply a better rule.
 
 ### No crafting bot base
 
@@ -98,12 +102,22 @@ with a character logged in can tell.
 **Running a manual test script and reporting what you saw is the single most useful thing anyone
 can contribute right now.**
 
-## What has never been run against a live client
+## Before you run it
 
-All of it. Every manual test script in `docs/` is written and none has been executed — there has
-been no Windows machine with a 3.3.5a client in this project's history. The unit tests are
-thorough (a simulated client, an x86 interpreter that executes the real injected bytes, both
-navigation mesh formats built byte-for-byte) but they test the bot against this project's own
-understanding of the client, which is exactly the thing that could be wrong.
+Treat the first run as an experiment, on an account you do not care about, and work through the
+manual test scripts in order rather than pressing Start. They are written so each only needs
+what the previous one established:
 
-Treat the first run as an experiment, on an account you do not care about.
+| Script | Establishes |
+| --- | --- |
+| [phase 1](phase-1-manual-test.md) | the offset table matches your client |
+| [phase 2](phase-2-manual-test.md) | code can run inside it, and Lua answers |
+| [phase 3](phase-3-manual-test.md) | click-to-move and pathing |
+| [phase 4](phase-4-manual-test.md) | casting and combat |
+| [phase 5](phase-5-manual-test.md) | looting, gear, the scheduler |
+| [phase 7](phase-7-manual-test.md) | the quest log assumptions |
+| [phase 8](phase-8-manual-test.md) | group play, and the battleground queue |
+
+**Botting violates the terms of service of Blizzard's servers and the rules of most private
+servers. Accounts get banned for it.** This project does not attempt to defeat server-side
+anti-cheat.

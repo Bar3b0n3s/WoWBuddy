@@ -18,10 +18,15 @@ zero, anything may change.
 - **Trade skills.** Reading what a character can make from the client's own window — no recipe
   data ships — and choosing the highest-colour recipe there are materials for.
 
+- **The live adapter.** `LiveBotState` implements `IBotState` against a real client,
+  `WorldCharacterView` reads the verified half from the object manager, `LiveCombatContext`
+  gives a rotation what it needs, and `BotRunner` ticks the tree with movement advanced first.
+  The Start button composes all of it.
+
 ### Missing
 
-- The live `IBotState` adapter that would let the behaviour tree run against a real client. See
-  [docs/status.md](docs/status.md).
+- **Evidence.** None of this has run against a real 3.3.5a client. See
+  [docs/status.md](docs/status.md) for what that means in practice.
 - A crafting bot base, and buying materials for one.
 
 ## [0.9.0] — 2026-09-06

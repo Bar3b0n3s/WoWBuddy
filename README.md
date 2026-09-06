@@ -7,10 +7,10 @@ the discontinued Honorbuddy. C# 12, .NET 8, WPF, Windows only. MIT licensed.
 > servers. Accounts get banned for it.** This project does not attempt to defeat server-side
 > anti-cheat. Using it is entirely at your own risk.
 
-## Status: a preview, and not yet a bot that plays
+## Status: complete, and entirely unproven
 
-Ten of the eleven phases are done, and one large piece is missing that stops the whole thing
-running unattended. Both halves of that sentence matter, so this section is specific.
+All eleven phases are done. Every piece is written, wired and tested — and none of it has ever
+run against a real client. Both halves of that sentence matter, so this section is specific.
 
 | Phase | State |
 | --- | --- |
@@ -23,7 +23,7 @@ running unattended. Both halves of that sentence matter, so this section is spec
 | 6 — Gather and Fish bases, world data | **Done** |
 | 7 — Questing base, profile schema and importer | **Done** |
 | 8 — Dungeons and battlegrounds, group play | **Done** |
-| 9 — Professions and the mixed-activity scheduler | **Mostly done** |
+| 9 — Professions and the mixed-activity scheduler | **Done**, less a crafting base |
 | 10 — All thirty combat routines, plugins, UI | **Done** |
 | 11 — Docs, packaging, release | **Done** |
 
@@ -43,18 +43,15 @@ bytes the bot would inject.
 
 ### What is missing
 
-**Nothing yet joins the two halves together.** Every bot base and routine is written against an
-interface called `IBotState` and tested against a fake implementation of it. Four adapters that
-read a real client through Lua now exist — the quest log, the party, the battleground queue and
-the bags — but the class that composes them with the memory-derived state and drives the
-behaviour tree on a timer does not. **So the Start button builds a tree and then tells you it
-cannot play it.**
+**Nothing structural. Everything is wired.** `LiveBotState` reads a real client into the
+interface every bot base was written against, `BotRunner` ticks the tree four times a second
+with movement advanced first, and the Start button composes the lot.
 
-**Some of the Lua underneath is unverified.** Positions, health, targets and the object manager
-rest on offsets that are checked against your client at attach time. The quest log, party, bags
-and battleground queue rest on scripting calls whose *existence* the bot checks at attach time
-but whose *exact behaviour* nobody has confirmed on a real 12340 client. The manual test scripts
-exist to confirm them, and running one is the single most useful thing a user can contribute.
+**What is missing is evidence.** Not one line of this has ever run against a 3.3.5a client —
+there has never been a Windows machine with one in this project's history. The 808 tests check
+the bot against this project's own understanding of the client, which is exactly the thing that
+could be wrong. Several Lua behaviours are assumed rather than confirmed, and hostility is an
+outright approximation because faction data is not shipped.
 
 See [docs/status.md](docs/status.md) for the detail, including exactly which assumptions are
 outstanding.

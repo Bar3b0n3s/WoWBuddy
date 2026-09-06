@@ -1,10 +1,18 @@
 using System;
+using System.IO;
+using System.Threading;
 using WoWBuddy.Behavior;
 using WoWBuddy.BotBases;
 using WoWBuddy.Core.Attach;
+using WoWBuddy.Common.Logging;
 using WoWBuddy.Core.Execution;
 using WoWBuddy.GameApi;
 using WoWBuddy.GameApi.Capabilities;
+using WoWBuddy.Common.Scheduling;
+using WoWBuddy.Live;
+using WoWBuddy.Navigation;
+using WoWBuddy.Navigation.Movement;
+using WoWBuddy.CombatRoutines;
 using WoWBuddy.Presentation;
 using WoWBuddy.Profiles;
 
@@ -34,12 +42,18 @@ public sealed class BotController : IBotController
     private GameClient? _client;
     private World? _world;
     private Node<IBotState>? _tree;
+    private CapabilityReport? _capabilities;
+    private BotRunner? _runner;
+    private Timer? _timer;
+    private MovementController? _movement;
+    private SpellCaster? _caster;
+    private int _ticking;
 
     /// <inheritdoc />
     public bool IsAttached => _client is not null;
 
     /// <inheritdoc />
-    public bool IsRunning { get; private set; }
+    public bool IsRunning => _runner is { IsRunning: true };
 
     /// <inheritdoc />
     public bool CanExecute => _client?.Execution is { IsUsable: true };
@@ -117,8 +131,26 @@ public sealed class BotController : IBotController
             return "Execution installed, but Lua could not be proved. The bot will not act on the game.";
         }
 
+        // Casting has a gate of its own, and it is the reason this project casts through the
+        // client's scripting rather than a native address it could not verify: the test asks
+        // the client whether the bot's scripts run in a secure context, and casting stays off
+        // if the answer is no.
+        _caster = new SpellCaster(lua);
+
+        if (!_caster.SelfTest(out string castDetail))
+        {
+            Log.For<BotController>().Warning(
+                "Casting is unavailable on this client: {Reason}", castDetail);
+        }
+
         CapabilityReport report = CapabilityProbes.Probe(lua);
-        ClientCapabilities = report.Describe();
+
+        _capabilities = report;
+        ClientCapabilities = report.Describe()
+            + Environment.NewLine
+            + (_caster.CanCast
+                ? "Casting: available."
+                : $"Casting: unavailable. {_caster.UnavailableReason}");
 
         return report.NothingUnexpected
             ? "Execution enabled."
@@ -132,20 +164,26 @@ public sealed class BotController : IBotController
         Stop();
 
         ClientCapabilities = string.Empty;
+        _caster = null;
         _world = null;
         _client?.Dispose();
         _client = null;
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// Composes the whole bot and starts ticking it. Every refusal before that point is a
+    /// sentence the user can act on rather than a silent failure: the tree is built here, so a
+    /// profile that does not give its bot base what it needs is caught before anything runs.
+    /// </remarks>
     public string Start(string botBase, string routine, string? profilePath)
     {
-        if (_client is null)
+        if (_client is null || _world is null)
         {
             return "Attach to a client first.";
         }
 
-        if (!CanExecute)
+        if (_client.Execution is not { IsUsable: true } execution || _capabilities is null)
         {
             return "Enable execution first.";
         }
@@ -164,8 +202,13 @@ public sealed class BotController : IBotController
             profile = loaded.Profile;
         }
 
-        // Building the tree is real, and worth doing here: it is where a profile that does not
-        // give a bot base what it needs is caught, and the message says which.
+        ICombatRoutine? chosen = new RoutineCatalogue().ByName(routine);
+
+        if (chosen is null)
+        {
+            return $"There is no combat routine called '{routine}'.";
+        }
+
         BotBaseBuild built = BotBaseFactory.Create(botBase, profile);
 
         if (!built.Success)
@@ -175,15 +218,96 @@ public sealed class BotController : IBotController
 
         _tree = built.Tree;
 
-        return built.Message
-            + "  The tree is built, but the bot cannot play yet: nothing implements IBotState "
-            + "against a live client. See docs/architecture.md.";
+        LiveBotState state = Compose(execution, chosen);
+
+        // Movement is the last gate. Nothing writes to the client's click-to-move block until
+        // this line, and a user who never gets here has had nothing injected that moves them.
+        _movement!.Enable();
+
+        _runner = new BotRunner(state, RootTree.Build(_tree!).Root);
+        _runner.Start();
+
+        // A tick every quarter second. Faster buys nothing — the client's own update rate is
+        // the floor on how quickly anything the bot reads can change — and costs a round trip
+        // onto the game thread each time.
+        _timer = new Timer(_ => Tick(), null, TimeSpan.Zero, TimeSpan.FromMilliseconds(250));
+
+        return built.Message;
+    }
+
+    /// <summary>Builds the live picture of the client from the pieces that read it.</summary>
+    private LiveBotState Compose(ExecutionSession execution, ICombatRoutine routine)
+    {
+        LuaBridge lua = execution.Lua;
+
+        WorldCharacterView view = new(
+            _world!,
+            new NativeFunctions(execution.Executor, _client!.Memory, _client.Objects),
+            lua);
+
+        _movement = new MovementController(execution.ClickToMove);
+
+        // Navigation data comes from the user's own extraction, and a missing folder is not an
+        // error here: the bot simply cannot walk, MoveTo says so, and the bases that need it
+        // report it rather than the whole thing refusing to start.
+        INavigationService navigation = new DetourNavigationService(
+            Path.Combine(AppContext.BaseDirectory, "mmaps"));
+
+        return new LiveBotState(
+            view,
+            _movement,
+            navigation,
+            new LuaQuestLog(lua, _capabilities!),
+            new LuaPartyState(lua, _capabilities!, () => view.Position, view.Locate),
+            new LuaBattlegrounds(lua, _capabilities!),
+            new LuaInventory(lua, _capabilities!),
+            new SessionScheduler(new SessionSchedule()),
+            routine,
+            new LiveCombatContext(lua, view, _caster));
+    }
+
+    /// <summary>
+    /// Runs one tick, never overlapping with itself.
+    /// </summary>
+    /// <remarks>
+    /// The timer fires on a thread pool thread, and a tick that runs long — a slow round trip
+    /// onto the game thread — would otherwise have the next one start on top of it. Two ticks
+    /// at once would read a half-updated picture and act on it twice.
+    /// </remarks>
+    private void Tick()
+    {
+        if (Interlocked.Exchange(ref _ticking, 1) == 1)
+        {
+            return;
+        }
+
+        try
+        {
+            if (_runner?.Tick(DateTimeOffset.UtcNow) is TickOutcome.Stopped or TickOutcome.Faulted)
+            {
+                StopTimer();
+            }
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _ticking, 0);
+        }
+    }
+
+    private void StopTimer()
+    {
+        _timer?.Dispose();
+        _timer = null;
     }
 
     /// <inheritdoc />
     public void Stop()
     {
-        IsRunning = false;
+        StopTimer();
+
+        _runner?.Stop();
+        _runner = null;
         _tree = null;
+        _movement = null;
     }
 }
