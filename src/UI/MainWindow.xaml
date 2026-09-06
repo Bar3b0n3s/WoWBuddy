@@ -38,6 +38,10 @@
         <!-- What to play -->
         <GroupBox DockPanel.Dock="Top" Header="What to play" Margin="0,0,0,8">
             <Grid Margin="4">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="220" />
@@ -66,6 +70,29 @@
                          Text="{Binding ProfilePath, UpdateSourceTrigger=PropertyChanged}" />
                 <Button Grid.Column="6" Content="Browse..." Width="80" Margin="6,0,0,0"
                         Click="OnBrowseProfileClicked" />
+
+                <!-- Settings the bot cannot work out for itself, and will not guess at. -->
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="Role:" VerticalAlignment="Center"
+                           Margin="0,8,6,0" />
+                <ComboBox Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" Margin="0,8,0,0"
+                          ItemsSource="{Binding Roles}"
+                          SelectedItem="{Binding Role}"
+                          ToolTip="Never detected. A bot wrong about this tanks in cloth." />
+
+                <TextBlock Grid.Row="1" Grid.Column="2" Text="Mail to:" VerticalAlignment="Center"
+                           Margin="12,8,6,0" />
+                <TextBox Grid.Row="1" Grid.Column="3" VerticalAlignment="Center" Margin="0,8,0,0"
+                         Text="{Binding MailRecipient, UpdateSourceTrigger=PropertyChanged}" />
+
+                <TextBlock Grid.Row="1" Grid.Column="4" Text="Meshes:" VerticalAlignment="Center"
+                           Margin="12,8,6,0" />
+                <TextBox Grid.Row="1" Grid.Column="5" VerticalAlignment="Center" Margin="0,8,0,0"
+                         Text="{Binding MmapsDirectory, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Where you extracted the navigation meshes. Blank means the mmaps folder beside WoWBuddy." />
+
+                <CheckBox Grid.Row="1" Grid.Column="6" Content="Skinning" Margin="6,8,0,0"
+                          VerticalAlignment="Center"
+                          IsChecked="{Binding CanSkin}" />
             </Grid>
         </GroupBox>
 

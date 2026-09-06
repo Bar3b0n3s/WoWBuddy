@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
+using WoWBuddy.BotBases.Group;
 using WoWBuddy.CombatRoutines;
+using WoWBuddy.Common.Configuration;
 using WoWBuddy.Plugins;
 using WoWBuddy.Profiles;
 
@@ -27,6 +29,10 @@ public sealed class MainViewModel : ObservableObject
     private readonly IBotController _controller;
     private readonly RoutineCatalogue _routines;
     private readonly PluginManager? _plugins;
+    private readonly ConfigStore? _config;
+
+    private BotSettings _settings = new();
+    private bool _loading;
 
     private ClientOption? _selectedClient;
     private BotBaseOption _selectedBotBase = BotBaseOption.All[0];
@@ -41,12 +47,14 @@ public sealed class MainViewModel : ObservableObject
         IClientDiscovery discovery,
         IBotController controller,
         RoutineCatalogue? routines = null,
-        PluginManager? plugins = null)
+        PluginManager? plugins = null,
+        ConfigStore? config = null)
     {
         _discovery = discovery ?? throw new ArgumentNullException(nameof(discovery));
         _controller = controller ?? throw new ArgumentNullException(nameof(controller));
         _routines = routines ?? new RoutineCatalogue();
         _plugins = plugins;
+        _config = config;
 
         RefreshCommand = new RelayCommand(RefreshClients);
         AttachCommand = new RelayCommand(Attach, () => CanAttach);
@@ -64,6 +72,7 @@ public sealed class MainViewModel : ObservableObject
 
         RefreshClients();
         RefreshPlugins();
+        LoadSettings();
     }
 
     // ---- what the window shows -----------------------------------------------------------
@@ -125,6 +134,7 @@ public sealed class MainViewModel : ObservableObject
             {
                 Raise(nameof(NeedsProfile));
                 RaiseCommandStates();
+                Remember(_settings with { BotBase = value.Name });
             }
         }
     }
@@ -138,6 +148,7 @@ public sealed class MainViewModel : ObservableObject
             if (Set(ref _selectedRoutine, value))
             {
                 RaiseCommandStates();
+                Remember(_settings with { Routine = value?.Name ?? string.Empty });
             }
         }
     }
@@ -151,6 +162,7 @@ public sealed class MainViewModel : ObservableObject
             if (Set(ref _profilePath, value))
             {
                 LoadProfile();
+                Remember(_settings with { ProfilePath = value });
             }
         }
     }
@@ -429,6 +441,120 @@ public sealed class MainViewModel : ObservableObject
         // The controller reports the class as part of its summary; without a parsed class
         // there is nothing to narrow to, and showing everything is the safe answer.
         Raise(nameof(CharacterSummary));
+    }
+
+    /// <summary>What the window remembers between sessions.</summary>
+    public BotSettings Settings => _settings;
+
+    /// <summary>The roles a character can be told it is playing.</summary>
+    public IReadOnlyList<PartyRole> Roles { get; } = Enum.GetValues<PartyRole>();
+
+    /// <summary>What the character plays in a group.</summary>
+    public PartyRole Role
+    {
+        get => _settings.Role;
+        set => Remember(_settings with { Role = value }, nameof(Role));
+    }
+
+    /// <summary>Whether the character can skin.</summary>
+    public bool CanSkin
+    {
+        get => _settings.CanSkin;
+        set => Remember(_settings with { CanSkin = value }, nameof(CanSkin));
+    }
+
+    /// <summary>Who to post keepable items to.</summary>
+    public string MailRecipient
+    {
+        get => _settings.MailRecipient;
+        set => Remember(_settings with { MailRecipient = value }, nameof(MailRecipient));
+    }
+
+    /// <summary>Where the navigation meshes are, or empty for the folder beside the bot.</summary>
+    public string MmapsDirectory
+    {
+        get => _settings.MmapsDirectory;
+        set => Remember(_settings with { MmapsDirectory = value }, nameof(MmapsDirectory));
+    }
+
+    /// <summary>
+    /// Reads back what was chosen last time.
+    /// </summary>
+    /// <remarks>
+    /// A missing or unreadable file leaves the defaults in place rather than failing: settings
+    /// are a convenience, and losing them should never stop the bot starting.
+    /// </remarks>
+    public void LoadSettings()
+    {
+        if (_config is null)
+        {
+            return;
+        }
+
+        _loading = true;
+
+        try
+        {
+            _settings = _config.Load<BotSettings>(BotSettings.FileName) ?? new BotSettings();
+
+            foreach (BotBaseOption option in BotBases)
+            {
+                if (string.Equals(option.Name, _settings.BotBase, StringComparison.OrdinalIgnoreCase))
+                {
+                    SelectedBotBase = option;
+                    break;
+                }
+            }
+
+            if (_routines.ByName(_settings.Routine) is { } routine)
+            {
+                SelectedRoutine = routine;
+            }
+
+            // Last, because setting it loads the profile and reports on it.
+            if (_settings.ProfilePath.Length > 0)
+            {
+                ProfilePath = _settings.ProfilePath;
+            }
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    /// <summary>Keeps a changed setting.</summary>
+    public void Remember(BotSettings settings, string? propertyName = null)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        _settings = settings;
+
+        if (propertyName is not null)
+        {
+            Raise(propertyName);
+        }
+
+        // Not while reading them back: every assignment during a load would write the file
+        // again, and a half-applied load would be what got written.
+        if (_loading || _config is null)
+        {
+            return;
+        }
+
+        try
+        {
+            _config.Save(BotSettings.FileName, _settings);
+        }
+        catch (IOException exception)
+        {
+            // A read-only folder, a full disk, a file open in something else. Worth saying and
+            // not worth stopping for.
+            // Fully qualified: this class has a Log property of its own, which is the window's
+            // log panel rather than the logger.
+            Common.Logging.Log.For<MainViewModel>().Warning(
+                exception, "Could not keep the settings. They will not survive this session.");
+        }
     }
 
     private void RaiseAttachmentStates()

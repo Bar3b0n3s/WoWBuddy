@@ -38,8 +38,10 @@ namespace WoWBuddy.UI;
 /// than nothing.
 /// </para>
 /// </remarks>
-public sealed class BotController : IBotController
+public sealed class BotController(BotSettings? settings = null) : IBotController
 {
+    private readonly BotSettings _settings = settings ?? new BotSettings();
+
     private GameClient? _client;
     private World? _world;
     private Node<IBotState>? _tree;
@@ -217,7 +219,11 @@ public sealed class BotController : IBotController
             botBase,
             profile,
             tradeSkills: _tradeSkills,
-            crafting: new CraftSettings { Profession = string.Empty });
+            crafting: new CraftSettings
+            {
+                Profession = _settings.CraftProfession,
+                Recipe = _settings.CraftRecipe,
+            });
 
         if (!built.Success)
         {
@@ -241,6 +247,7 @@ public sealed class BotController : IBotController
             errandHandler = new ErrandHandler(new ErrandHandlerSettings
             {
                 Vendors = profile.Vendors,
+                MailRecipient = _settings.MailRecipient,
             })
             .Build();
         }
@@ -268,7 +275,8 @@ public sealed class BotController : IBotController
         WorldCharacterView view = new(
             _world!,
             new NativeFunctions(execution.Executor, _client!.Memory, _client.Objects),
-            lua);
+            lua,
+            canSkin: _settings.CanSkin);
 
         _movement = new MovementController(execution.ClickToMove);
 
@@ -276,14 +284,17 @@ public sealed class BotController : IBotController
         // error here: the bot simply cannot walk, MoveTo says so, and the bases that need it
         // report it rather than the whole thing refusing to start.
         INavigationService navigation = new DetourNavigationService(
-            Path.Combine(AppContext.BaseDirectory, "mmaps"));
+            _settings.ResolveMmaps(AppContext.BaseDirectory));
 
         return new LiveBotState(
             view,
             _movement,
             navigation,
             new LuaQuestLog(lua, _capabilities!),
-            new LuaPartyState(lua, _capabilities!, () => view.Position, view.Locate),
+            new LuaPartyState(lua, _capabilities!, () => view.Position, view.Locate)
+            {
+                MyRole = _settings.Role,
+            },
             new LuaBattlegrounds(lua, _capabilities!),
             new LuaInventory(lua, _capabilities!),
             new LuaVendor(lua, _capabilities!),

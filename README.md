@@ -23,7 +23,7 @@ run against a real client. Both halves of that sentence matter, so this section 
 | 6 — Gather and Fish bases, world data | **Done** |
 | 7 — Questing base, profile schema and importer | **Done** |
 | 8 — Dungeons and battlegrounds, group play | **Done** |
-| 9 — Professions and the mixed-activity scheduler | **Done**, less a crafting base |
+| 9 — Professions and the mixed-activity scheduler | **Done** |
 | 10 — All thirty combat routines, plugins, UI | **Done** |
 | 11 — Docs, packaging, release | **Done** |
 

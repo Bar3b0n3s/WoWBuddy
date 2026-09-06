@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Threading;
 using WoWBuddy.CombatRoutines;
+using WoWBuddy.Common.Configuration;
 using WoWBuddy.Common.Logging;
 using WoWBuddy.Plugins;
 using WoWBuddy.Presentation;
@@ -65,11 +66,17 @@ public partial class App : Application
             Log.For<App>().Warning("{Problem}", problem);
         }
 
+        // The window's own choices, kept between sessions. Read once here so the controller
+        // and the view model agree about them from the start.
+        ConfigStore config = new();
+        BotSettings settings = config.Load<BotSettings>(BotSettings.FileName) ?? new BotSettings();
+
         MainViewModel model = new(
             new WowClientDiscovery(),
-            new BotController(),
+            new BotController(settings),
             routines,
-            _plugins);
+            _plugins,
+            config);
 
         // The buffer the window binds to is the one the sink writes into, so lines logged
         // during start-up above are already there when the window opens.

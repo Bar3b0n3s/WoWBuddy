@@ -31,6 +31,8 @@ zero, anything may change.
 
 ### Added
 
+- **The window remembers what you chose.** Bot base, routine, profile, group role, skinning,
+  mail recipient and where the navigation meshes are. Nothing that could log a character in.
 - **Skinning.** A corpse becomes skinnable once looted, so the root tree works looting and
   skinning in turn and the character makes one trip to each body.
 - **A crafting bot base.** Opens a profession, makes whatever raises the skill fastest or a
