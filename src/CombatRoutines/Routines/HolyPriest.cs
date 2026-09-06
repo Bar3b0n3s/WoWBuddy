@@ -37,6 +37,10 @@ public sealed class HolyPriest : RoutineBase
     public override double ReadyPowerPercent => 80d;
 
     /// <inheritdoc />
+    /// <remarks>A healer has plenty to do with nothing targeted, starting with healing.</remarks>
+    protected override bool NeedsTargetToFight => false;
+
+    /// <inheritdoc />
     protected override Rotation BuffRotation { get; } = new Rotation()
         .Cast("Power Word: Fortitude", c => !c.HasAura(c.Me, "Power Word: Fortitude"), onSelf: true)
         .Cast("Inner Fire", c => !c.HasAura(c.Me, "Inner Fire"), onSelf: true)

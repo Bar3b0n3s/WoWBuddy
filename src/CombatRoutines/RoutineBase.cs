@@ -52,6 +52,17 @@ public abstract class RoutineBase : ICombatRoutine
     /// <summary>What to do while recovering. May be empty.</summary>
     protected virtual Rotation RestRotation { get; } = new();
 
+    /// <summary>
+    /// Whether the routine needs something targeted before it can do anything useful.
+    /// </summary>
+    /// <remarks>
+    /// True for everything that fights, which is almost everything: casting a damage spell at
+    /// nothing burns the global cooldown on something the client will refuse. Healers set it
+    /// false, because they have plenty to do with no target at all — and since phase 8 they are
+    /// asked to act while the group fights and they have not been drawn in.
+    /// </remarks>
+    protected virtual bool NeedsTargetToFight => true;
+
     /// <inheritdoc />
     public virtual bool Buff(ICombatContext context) => BuffRotation.Execute(context) is not null;
 
@@ -59,7 +70,17 @@ public abstract class RoutineBase : ICombatRoutine
     public virtual bool Pull(ICombatContext context) => PullRotation.Execute(context) is not null;
 
     /// <inheritdoc />
-    public virtual bool Combat(ICombatContext context) => CombatRotation.Execute(context) is not null;
+    public virtual bool Combat(ICombatContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        if (NeedsTargetToFight && context.Target is not { IsAlive: true })
+        {
+            return false;
+        }
+
+        return CombatRotation.Execute(context) is not null;
+    }
 
     /// <inheritdoc />
     public virtual bool Rest(ICombatContext context)

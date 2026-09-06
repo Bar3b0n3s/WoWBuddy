@@ -106,6 +106,15 @@ public interface ICombatContext
     /// </para>
     /// </remarks>
     bool CastOn(string spellName, UnitSnapshot unit) => false;
+
+    /// <summary>
+    /// Combo points on the current target, 0 to 5.
+    /// </summary>
+    /// <remarks>
+    /// Only rogues and cat-form druids have these, so it is defaulted rather than forced on
+    /// every context. The live implementation reads <c>GetComboPoints("player", "target")</c>.
+    /// </remarks>
+    int ComboPoints => 0;
 }
 
 /// <summary>

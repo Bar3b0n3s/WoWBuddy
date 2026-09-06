@@ -17,6 +17,15 @@ public sealed class FakeCombat : ICombatContext
     /// <summary>Spells that are ready. Anything not listed is treated as unavailable.</summary>
     public HashSet<string> Ready { get; } = [];
 
+    /// <summary>
+    /// Treats every spell as ready, whatever <see cref="Ready"/> says.
+    /// </summary>
+    /// <remarks>
+    /// For asking a rotation what it would do at its best. Checking a specific priority still
+    /// wants <see cref="WithReady"/>, which is what makes "this rule beats that one" testable.
+    /// </remarks>
+    public bool ReadyForAnything { get; set; }
+
     /// <summary>Auras on the character.</summary>
     public HashSet<string> MyAuras { get; } = [];
 
@@ -44,6 +53,9 @@ public sealed class FakeCombat : ICombatContext
 
     /// <inheritdoc />
     public int EnemiesInMelee { get; set; }
+
+    /// <inheritdoc />
+    public int ComboPoints { get; set; }
 
     /// <inheritdoc />
     public bool IsCasting { get; set; }
@@ -92,7 +104,7 @@ public sealed class FakeCombat : ICombatContext
     }
 
     /// <inheritdoc />
-    public bool IsSpellReady(string spellName) => Ready.Contains(spellName);
+    public bool IsSpellReady(string spellName) => ReadyForAnything || Ready.Contains(spellName);
 
     /// <inheritdoc />
     public bool HasAura(UnitSnapshot unit, string auraName)
