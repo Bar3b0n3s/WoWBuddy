@@ -46,6 +46,29 @@ The same reasoning applies to the other bots surveyed. Every 3.3.5a bot found du
 work was GPL-3.0, unlicensed (and therefore all rights reserved), or under a bespoke
 proprietary licence. None can be used as a code source.
 
+## Honorbuddy profiles
+
+WoWBuddy can convert Honorbuddy questing profiles. That is worth stating precisely, because
+Honorbuddy itself is exactly the sort of code this project must stay clear of.
+
+1. **No Honorbuddy code is used, read, decompiled or included.** The importer is written
+   against the *shape of the XML files users already have*, not against the bot that read
+   them.
+2. **No profile is included in this repository.** Community profiles are other people's work
+   and are not this project's to redistribute. The importer reads a file the user supplies.
+3. **What the importer knows is a vocabulary of element and attribute names**, recorded in
+   `HonorbuddyVocabulary`. Names of things in a data format are not the format's
+   implementation, and the mapping was derived from published profiles rather than from any
+   proprietary source. It is documented as observational, and it is incomplete on purpose:
+   the importer reports what it cannot translate instead of pretending to know more than it
+   does.
+4. **Custom behaviours are not converted at all.** They are compiled C# shipped with a
+   profile. The importer records that the step existed and refuses to claim it works.
+
+The same reasoning applies here as to offsets below: the *facts* about a file format — what
+its elements are called — can be observed and recorded, while the code that implemented it
+cannot be copied.
+
 ## Dependency policy
 
 Only MIT, BSD, Apache-2.0 and zlib licensed packages may be referenced. Current dependencies:
@@ -83,6 +106,9 @@ their output or talks to them over a socket.
 - World data exported from a server database. Users export it from their own installation.
 - Any account credential. The optional auto-login feature stores credentials encrypted with
   Windows DPAPI, in the user's profile, never in the repository.
+- Community profiles written for any other bot. The importer reads files the user already has.
+- Quest ids, creature entries or coordinates. `profiles/example.xml` documents the profile
+  format with invented ids and does not run.
 
 ## Risk to the user
 

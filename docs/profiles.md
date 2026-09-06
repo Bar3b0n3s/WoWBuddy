@@ -50,6 +50,11 @@ skipped, so you can see exactly how much of it the bot understood.
 | `Faction`  | `Alliance`, `Horde`, `Any` (`Both` also works) | `Any`   |
 | `MinLevel` | Lowest level it is written for                 | 1       |
 | `MaxLevel` | Highest level it is written for                | 80      |
+| `Map`      | Default map for every step that omits one      | 0       |
+
+Most profiles cover one continent, so `Map` on the root saves writing it on every step. A step,
+vendor or blackspot that names its own `Map` overrides it. Eastern Kingdoms is 0, Kalimdor 1,
+Outland 530, Northrend 571.
 
 ## Sections
 
@@ -140,3 +145,55 @@ WoWBuddy.Inspector profile check my-profile.xml
 ```
 
 That prints the same report the bot would, without needing the game running.
+
+## Importing Honorbuddy profiles
+
+```
+WoWBuddy.Inspector profile import old-profile.xml --map 1 --out new-profile.xml
+```
+
+Years of questing profiles exist for the bot this one replaces, and rewriting them by hand is
+not realistic. The importer converts what it can and — more importantly — tells you what it
+could not.
+
+**Read the report, not just the file.** The importer's exit code is non-zero whenever anything
+was lost, even though it still writes a usable profile. The report counts steps converted,
+steps it did not recognise, conditions translated and conditions lost, then lists each problem
+with the line it was on.
+
+### What does not survive, and why
+
+- **Custom behaviours are code.** Honorbuddy's `CustomBehavior` runs a compiled C# class shipped
+  with the profile. Nothing here can run one. The step is kept with its name and arguments so
+  it is visible and can be written as a WoWBuddy behaviour, but it does nothing until one
+  exists under that name.
+- **Most conditions.** Honorbuddy conditions are arbitrary C#; WoWBuddy's are seven terms on
+  purpose. `Me.Level < 10`, `HasQuest(id)`, `IsQuestCompleted(id)`, `HasItem(id)` and
+  `GetItemCount(id) >= n` translate, including `!` and `== false` and clauses joined by `&&`.
+  Everything else is reported with its original text. `||` has no equivalent — split the step
+  in two.
+- **Steps the importer does not know.** Named, counted, and missing from the result.
+- **Attributes it does not know.** Listed one per line, because that is where a conversion
+  quietly loses behaviour.
+
+A step whose condition could not be translated is **kept, not dropped** — dropping it loses
+quest progress — but it now runs unconditionally, which is why the import is never called clean
+while any remain. Those are the steps to check first. A `While` is the exception: one whose
+condition was lost is left out entirely, because emitting a loop that never ends is worse than
+emitting nothing.
+
+### The map has to be told
+
+Honorbuddy profiles do not record which map they are for; the bot knew it from where the
+character was standing. `--map` is therefore required, and the converted profile carries it as
+`Map` on the root. Get it wrong and the profile navigates nowhere.
+
+### How much of this is guesswork
+
+Honorbuddy's format was never published as a specification. The element and attribute names the
+importer recognises were derived from the shape of profiles the community wrote, and they live
+in one file — `HonorbuddyVocabulary` — so a mapping that turns out to be wrong has one place to
+fix. Expect the importer to be incomplete; that is what the report is for.
+
+No Honorbuddy code or profile is included in this repository. The importer reads files you
+already have.

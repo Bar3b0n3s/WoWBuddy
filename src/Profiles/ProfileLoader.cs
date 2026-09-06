@@ -123,6 +123,7 @@ public static class ProfileLoader
         string author = reader.Text("Author");
         int minimumLevel = reader.Integer("MinLevel", 1);
         int maximumLevel = reader.Integer("MaxLevel", 80);
+        int defaultMapId = reader.Integer("Map");
         ProfileFaction faction = ReadFaction(reader);
         reader.WarnAboutUnreadAttributes();
 
@@ -147,15 +148,15 @@ public static class ProfileLoader
             switch (section.Name.LocalName.ToUpperInvariant())
             {
                 case "QUESTORDER":
-                    steps.AddRange(ReadSteps(section, issues, []));
+                    steps.AddRange(ReadSteps(section, issues, [], defaultMapId));
                     break;
 
                 case "VENDORS":
-                    vendors.AddRange(ReadVendors(section, issues));
+                    vendors.AddRange(ReadVendors(section, issues, defaultMapId));
                     break;
 
                 case "BLACKSPOTS":
-                    blackspots.AddRange(ReadBlackspots(section, issues));
+                    blackspots.AddRange(ReadBlackspots(section, issues, defaultMapId));
                     break;
 
                 case "AVOIDMOBS":
@@ -223,7 +224,8 @@ public static class ProfileLoader
     private static List<ProfileStep> ReadSteps(
         XElement parent,
         List<ProfileIssue> issues,
-        IReadOnlyList<ProfileCondition> inherited)
+        IReadOnlyList<ProfileCondition> inherited,
+        int defaultMapId)
     {
         List<ProfileStep> steps = [];
 
@@ -246,7 +248,7 @@ public static class ProfileLoader
                         reader.Error("needs a Condition. Without one it does nothing but nest its contents.");
                     }
 
-                    List<ProfileStep> inner = ReadSteps(element, issues, Combine(inherited, conditions));
+                    List<ProfileStep> inner = ReadSteps(element, issues, Combine(inherited, conditions), defaultMapId);
 
                     if (inner.Count == 0)
                     {
@@ -267,7 +269,7 @@ public static class ProfileLoader
                         reader.Error("needs a Condition. Without one the bot would repeat it forever.");
                     }
 
-                    List<ProfileStep> children = ReadSteps(element, issues, []);
+                    List<ProfileStep> children = ReadSteps(element, issues, [], defaultMapId);
 
                     if (children.Count == 0)
                     {
@@ -283,21 +285,21 @@ public static class ProfileLoader
                 }
 
                 case "PICKUP":
-                    steps.Add(ReadQuestStep(reader, StepKind.PickUp, inherited));
+                    steps.Add(ReadQuestStep(reader, StepKind.PickUp, inherited, defaultMapId));
                     break;
 
                 case "TURNIN":
-                    steps.Add(ReadQuestStep(reader, StepKind.TurnIn, inherited));
+                    steps.Add(ReadQuestStep(reader, StepKind.TurnIn, inherited, defaultMapId));
                     break;
 
                 case "OBJECTIVE":
-                    steps.Add(ReadObjective(reader, inherited));
+                    steps.Add(ReadObjective(reader, inherited, defaultMapId));
                     break;
 
                 case "RUNTO":
                 {
                     Vector3 position = reader.Position(required: true);
-                    int mapId = reader.Integer("Map");
+                    int mapId = reader.MapId(defaultMapId);
                     IReadOnlyList<ProfileCondition> conditions = reader.Conditions();
                     reader.WarnAboutUnreadAttributes();
 
@@ -313,7 +315,7 @@ public static class ProfileLoader
                 case "GRIND":
                 {
                     Vector3 position = reader.Position(required: true);
-                    int mapId = reader.Integer("Map");
+                    int mapId = reader.MapId(defaultMapId);
                     float radius = reader.Number("Radius", 100f);
                     IReadOnlyList<ProfileCondition> conditions = reader.Conditions();
                     IReadOnlyList<Vector3> hotspots = ReadHotspots(reader, issues);
@@ -377,12 +379,13 @@ public static class ProfileLoader
     private static ProfileStep ReadQuestStep(
         ProfileXml reader,
         StepKind kind,
-        IReadOnlyList<ProfileCondition> inherited)
+        IReadOnlyList<ProfileCondition> inherited,
+        int defaultMapId)
     {
         uint questId = reader.Id("QuestId");
         string questName = reader.Text("QuestName");
         uint entry = reader.Id("Entry");
-        int mapId = reader.Integer("Map");
+        int mapId = reader.MapId(defaultMapId);
         Vector3 position = reader.Position(required: false);
         IReadOnlyList<ProfileCondition> conditions = reader.Conditions();
         reader.WarnAboutUnreadAttributes();
@@ -412,13 +415,14 @@ public static class ProfileLoader
 
     private static ProfileStep ReadObjective(
         ProfileXml reader,
-        IReadOnlyList<ProfileCondition> inherited)
+        IReadOnlyList<ProfileCondition> inherited,
+        int defaultMapId)
     {
         uint questId = reader.Id("QuestId");
         string questName = reader.Text("QuestName");
         uint entry = reader.Id("Entry");
         uint itemId = reader.Id("ItemId");
-        int mapId = reader.Integer("Map");
+        int mapId = reader.MapId(defaultMapId);
         int index = reader.Integer("Index");
         int count = reader.Integer("Count");
         float radius = reader.Number("Radius", 100f);
@@ -542,7 +546,7 @@ public static class ProfileLoader
         return hotspots;
     }
 
-    private static List<ProfileVendor> ReadVendors(XElement parent, List<ProfileIssue> issues)
+    private static List<ProfileVendor> ReadVendors(XElement parent, List<ProfileIssue> issues, int defaultMapId)
     {
         List<ProfileVendor> vendors = [];
 
@@ -561,7 +565,7 @@ public static class ProfileLoader
 
             string name = reader.Text("Name");
             uint entry = reader.Id("Entry");
-            int mapId = reader.Integer("Map");
+            int mapId = reader.MapId(defaultMapId);
             Vector3 position = reader.Position(required: true);
             bool canRepair = !isMailbox && reader.Flag("Repair");
             reader.WarnAboutUnreadAttributes();
@@ -577,7 +581,7 @@ public static class ProfileLoader
         return vendors;
     }
 
-    private static List<ProfileBlackspot> ReadBlackspots(XElement parent, List<ProfileIssue> issues)
+    private static List<ProfileBlackspot> ReadBlackspots(XElement parent, List<ProfileIssue> issues, int defaultMapId)
     {
         List<ProfileBlackspot> blackspots = [];
 
@@ -593,7 +597,7 @@ public static class ProfileLoader
 
             Vector3 position = reader.Position(required: true);
             float radius = reader.Number("Radius", 20f);
-            int mapId = reader.Integer("Map");
+            int mapId = reader.MapId(defaultMapId);
             string reason = reader.Text("Reason");
             reader.WarnAboutUnreadAttributes();
 

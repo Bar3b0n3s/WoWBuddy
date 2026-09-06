@@ -90,6 +90,19 @@ internal sealed class ProfileXml(XElement element, List<ProfileIssue> issues)
         return fallback;
     }
 
+    /// <summary>
+    /// Reads the map this element is on, falling back to the profile's default.
+    /// </summary>
+    /// <remarks>
+    /// Most profiles cover one continent, so writing Map on every step is noise. The root
+    /// element's Map sets the default and a step only states its own when it differs.
+    /// </remarks>
+    public int MapId(int fallback)
+    {
+        _read.Add("Map");
+        return Find("Map") is null ? fallback : Integer("Map", fallback);
+    }
+
     /// <summary>Reads a decimal attribute, complaining when it is not one.</summary>
     public float Number(string name, float fallback = 0f)
     {

@@ -12,6 +12,7 @@ using WoWBuddy.GameApi.Objects;
 using WoWBuddy.Navigation;
 using WoWBuddy.Navigation.Data;
 using WoWBuddy.Profiles;
+using WoWBuddy.Profiles.Import;
 using WoWBuddy.WorldData;
 
 namespace WoWBuddy.Inspector;
@@ -99,6 +100,11 @@ public static class Program
               profile check <file.xml>
                                 Read a profile and report everything wrong with it.
                                 Needs no game client.
+
+              profile import <file.xml> --map N [--out OUT.xml]
+                                Convert an Honorbuddy profile, reporting what could
+                                not be translated. --map is the map the profile is
+                                for; Honorbuddy profiles do not record one.
 
               help              Show this text.
 
@@ -630,11 +636,22 @@ public static class Program
     /// </remarks>
     private static int CheckProfile(string[] args)
     {
-        if (args.Length < 3
-            || !string.Equals(args[1], "check", StringComparison.OrdinalIgnoreCase))
+        if (args.Length < 3)
         {
             Console.Error.WriteLine("Usage: profile check <file.xml>");
+            Console.Error.WriteLine("       profile import <file.xml> --map N [--out OUT.xml]");
             Console.Error.WriteLine("See docs/profiles.md for the format.");
+            return 2;
+        }
+
+        if (string.Equals(args[1], "import", StringComparison.OrdinalIgnoreCase))
+        {
+            return ImportProfile(args);
+        }
+
+        if (!string.Equals(args[1], "check", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.Error.WriteLine($"Unknown profile command '{args[1]}'. Use check or import.");
             return 2;
         }
 
@@ -682,6 +699,76 @@ public static class Program
         Console.WriteLine(result.Success
             ? "The profile is usable."
             : "The profile cannot be run until the errors above are fixed.");
+
+        return result.Success ? 0 : 1;
+    }
+
+
+    /// <summary>
+    /// Converts an Honorbuddy profile and prints what could not be carried across.
+    /// </summary>
+    /// <remarks>
+    /// The report matters more than the file. A conversion that quietly dropped a condition
+    /// produces a profile that looks right and does the wrong thing an hour in, so the exit
+    /// code is non-zero whenever anything was lost, even though a usable file was still written.
+    /// </remarks>
+    private static int ImportProfile(string[] args)
+    {
+        string path = args[2];
+        int mapId = 0;
+        bool mapGiven = false;
+        string? output = null;
+
+        for (int index = 3; index < args.Length - 1; index++)
+        {
+            if (string.Equals(args[index], "--map", StringComparison.OrdinalIgnoreCase)
+                && int.TryParse(args[index + 1], NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed))
+            {
+                mapId = parsed;
+                mapGiven = true;
+            }
+            else if (string.Equals(args[index], "--out", StringComparison.OrdinalIgnoreCase))
+            {
+                output = args[index + 1];
+            }
+        }
+
+        if (!mapGiven)
+        {
+            Console.Error.WriteLine(
+                "Pass --map N. Honorbuddy profiles do not record which map they are for, and a "
+                + "converted profile on the wrong map navigates nowhere.");
+            Console.Error.WriteLine("Eastern Kingdoms is 0, Kalimdor 1, Outland 530, Northrend 571.");
+            return 2;
+        }
+
+        ProfileImportResult result = HonorbuddyImporter.ImportFile(path, mapId);
+
+        Console.WriteLine(result.Describe());
+        Console.WriteLine();
+
+        if (!result.ProducedSomething)
+        {
+            return 1;
+        }
+
+        string destination = output ?? Path.ChangeExtension(path, ".wowbuddy.xml");
+
+        try
+        {
+            File.WriteAllText(destination, result.ConvertedXml);
+            Console.WriteLine($"Written to {destination}");
+        }
+        catch (IOException exception)
+        {
+            Console.Error.WriteLine($"Could not write {destination}: {exception.Message}");
+            return 1;
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            Console.Error.WriteLine($"Could not write {destination}: {exception.Message}");
+            return 1;
+        }
 
         return result.Success ? 0 : 1;
     }
