@@ -11,6 +11,7 @@
     <ProjectReference Include="..\Core\WoWBuddy.Core.csproj" />
     <ProjectReference Include="..\GameApi\WoWBuddy.GameApi.csproj" />
     <ProjectReference Include="..\Navigation\WoWBuddy.Navigation.csproj" />
+    <ProjectReference Include="..\Profiles\WoWBuddy.Profiles.csproj" />
     <ProjectReference Include="..\WorldData\WoWBuddy.WorldData.csproj" />
   </ItemGroup>
   <ItemGroup>

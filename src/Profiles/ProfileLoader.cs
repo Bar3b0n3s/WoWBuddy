@@ -387,12 +387,19 @@ public static class ProfileLoader
         uint entry = reader.Id("Entry");
         int mapId = reader.MapId(defaultMapId);
         Vector3 position = reader.Position(required: false);
+        int rewardIndex = kind == StepKind.TurnIn ? reader.Integer("Reward") : 0;
         IReadOnlyList<ProfileCondition> conditions = reader.Conditions();
         reader.WarnAboutUnreadAttributes();
 
         if (questId == 0)
         {
             reader.Error("needs a QuestId.");
+        }
+
+        if (rewardIndex < 0)
+        {
+            reader.Error($"has Reward={rewardIndex}; rewards are numbered from 1, and 0 means "
+                + "the quest offers no choice.");
         }
 
         if (entry == 0 && position.IsZero)
@@ -409,6 +416,7 @@ public static class ProfileLoader
             Entry: entry,
             Position: position,
             MapId: mapId,
+            RewardIndex: rewardIndex,
             Conditions: Combine(inherited, conditions),
             LineNumber: reader.Line);
     }

@@ -3,6 +3,7 @@ using WoWBuddy.Common.Geometry;
 using WoWBuddy.CombatRoutines;
 using WoWBuddy.BotBases.Support;
 using WoWBuddy.Common.Scheduling;
+using WoWBuddy.BotBases.Questing;
 using WoWBuddy.Core.Objects;
 
 namespace WoWBuddy.BotBases;
@@ -167,4 +168,18 @@ public interface IBotState
     /// this errand" rather than as an error.
     /// </remarks>
     bool BeginErrand(Errand errand);
+
+    // ---- Added in phase 7 -------------------------------------------------------------
+
+    /// <summary>The character's quest log, and the verbs for changing it.</summary>
+    IQuestLog Quests { get; }
+
+    /// <summary>How many of an item the character is carrying, across all bags.</summary>
+    int ItemCount(uint itemId);
+
+    /// <summary>
+    /// Uses an item from the bags, on the current target when it has one.
+    /// </summary>
+    /// <returns>False when the item is not carried or is on cooldown.</returns>
+    bool UseItem(uint itemId);
 }

@@ -66,7 +66,8 @@ covers confirming click-to-move before anything writes to it,
 [docs/phase-4-manual-test.md](docs/phase-4-manual-test.md) covers combat, and
 [docs/phase-5-manual-test.md](docs/phase-5-manual-test.md) covers looting, gear and the
 scheduler. [docs/world-data.md](docs/world-data.md) covers how the bot learns where things are, and
-[docs/profiles.md](docs/profiles.md) covers the profile format the questing base reads.
+[docs/profiles.md](docs/profiles.md) covers the profile format the questing base reads,
+with [docs/phase-7-manual-test.md](docs/phase-7-manual-test.md) for questing.
 
 ## How this project handles low-level facts
 

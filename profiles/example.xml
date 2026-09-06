@@ -40,7 +40,9 @@
       <Hotspot X="1580" Y="-2420" Z="60" />
     </Objective>
 
-    <TurnIn QuestId="9001" Entry="8100" Map="0" X="1500" Y="-2500" Z="60" />
+    <!-- Reward picks which of the quest's rewards to take, numbered from 1. Leave it out
+         when the quest offers no choice: the bot will not guess. -->
+    <TurnIn QuestId="9001" Entry="8100" Map="0" X="1500" Y="-2500" Z="60" Reward="2" />
 
     <!-- Conditions gate a step. Every clause of an && must hold. -->
     <PickUp QuestId="9002" Entry="8100" Map="0" X="1500" Y="-2500" Z="60"

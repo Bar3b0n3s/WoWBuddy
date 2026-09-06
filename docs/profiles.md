@@ -91,6 +91,11 @@ already done.
 | `While`           | Repeats the steps inside it                     | `Condition`, and at least one step        |
 | `CustomBehavior`  | Runs a behaviour compiled into the bot          | `Name`                                    |
 
+`TurnIn` also takes `Reward="2"` — which of the quest's rewards to take, numbered from 1.
+Leave it out when the quest offers no choice. The bot does not pick for you: choosing well needs
+item statistics it does not have at the moment the window opens, and taking the wrong reward is
+not undoable, so the profile decides.
+
 `If` is not a step of its own. The loader folds its condition onto each child, so what the
 runner walks is always a flat list and every step carries every condition that governs it.
 `While` really does loop, which is why a missing condition is an error rather than a warning.
@@ -197,3 +202,39 @@ fix. Expect the importer to be incomplete; that is what the report is for.
 
 No Honorbuddy code or profile is included in this repository. The importer reads files you
 already have.
+
+## What the questing base does with a profile
+
+On every tick it asks, from the top of the list, which is the first step whose conditions hold
+and which is not already done. There is no cursor and no "step 43 of 200". That costs a walk
+over the list and buys back everything that goes wrong with a cursor: a quest abandoned by hand,
+an objective finished by a passing player, a session resumed a day later against a character
+that moved on. All of those resolve to a different answer next tick instead of leaving the bot
+working a step the world has passed.
+
+A step counts as done when the game says so, never when the bot remembers doing it:
+
+| Step        | Done when                                                             |
+| ----------- | --------------------------------------------------------------------- |
+| `PickUp`    | the quest is in the log, or recorded as handed in                     |
+| `TurnIn`    | the quest is recorded as handed in                                    |
+| `Objective` | the quest is complete, that objective is done, or the items are carried |
+| `RunTo`     | the character is within five yards                                    |
+| `Grind`     | never — its conditions are what stop it                               |
+| `Repeat`    | its condition stops holding                                           |
+
+Running out of steps is not an error. A profile written for levels 1 to 10 stops having
+anything to do at 10, and a character standing still is worse than one levelling slowly, so the
+base falls back to grinding.
+
+### The one thing 3.3.5a cannot tell us
+
+There is no way to ask a 3.3.5a client whether a character has ever handed in a given quest.
+`IsQuestFlaggedCompleted` arrived in 4.0, and no offset for the client's completed-quest bitmask
+is recorded in this project — it is marked as a thing to find, not guessed at.
+
+So the bot remembers what it hands in, per character, and assumes nothing else. On a character
+with history that means it will walk to a quest giver and find the quest is not on offer. When
+that happens it records the quest as done and moves on, so the cost is one walk rather than a
+stuck session — but it does mean a profile started on an old character will do some pointless
+walking early on.

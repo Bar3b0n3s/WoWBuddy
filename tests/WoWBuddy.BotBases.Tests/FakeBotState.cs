@@ -1,4 +1,5 @@
 using WoWBuddy.Behavior;
+using WoWBuddy.BotBases.Questing;
 using WoWBuddy.BotBases;
 using WoWBuddy.BotBases.Support;
 using WoWBuddy.CombatRoutines;
@@ -223,6 +224,40 @@ public sealed class FakeBotState : IBotState
     {
         Actions.Add($"Interact({guid})");
         return true;
+    }
+
+    // ---- phase 7 ----------------------------------------------------------------------
+
+    public FakeQuestLog QuestLog { get; } = new();
+
+    public IQuestLog Quests => QuestLog;
+
+    /// <summary>What the character is carrying, by item id.</summary>
+    public Dictionary<uint, int> Items { get; } = [];
+
+    /// <summary>Items whose use fails, for testing what happens when it does.</summary>
+    public HashSet<uint> UnusableItems { get; } = [];
+
+    public int ItemCount(uint itemId) => Items.TryGetValue(itemId, out int count) ? count : 0;
+
+    public bool UseItem(uint itemId)
+    {
+        Actions.Add($"UseItem({itemId})");
+        return ItemCount(itemId) > 0 && !UnusableItems.Contains(itemId);
+    }
+
+    /// <summary>Places a creature or object the client can see.</summary>
+    public VisibleObject AddVisible(ulong guid, uint entry, float distance = 10f, bool hasPosition = true)
+    {
+        var visible = new VisibleObject(
+            new WoWGuid(guid | ((ulong)WoWGuidType.Creature << 48)),
+            entry,
+            new Vector3(Position.X + distance, Position.Y, Position.Z),
+            hasPosition,
+            distance);
+
+        VisibleObjects = [.. VisibleObjects, visible];
+        return visible;
     }
 
     /// <summary>Places a lootable corpse nearby.</summary>

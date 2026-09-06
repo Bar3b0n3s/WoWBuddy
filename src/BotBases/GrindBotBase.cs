@@ -1,4 +1,5 @@
 using WoWBuddy.Behavior;
+using WoWBuddy.BotBases.Support;
 using WoWBuddy.Common.Geometry;
 using WoWBuddy.Common.Logging;
 
@@ -116,28 +117,8 @@ public sealed class GrindBotBase
     /// <summary>Builds the subtree the root tree runs when nothing has gone wrong.</summary>
     public Node<IBotState> Build() =>
         new PrioritySelector<IBotState>(
-            // Something already selected and alive: close on it and start the fight. The
-            // routine's own pull range decides where "close enough" is, which is what stops a
-            // mage walking into melee for a fight it should open at thirty yards.
-            new If<IBotState>(
-                s => s.Target is { IsAlive: true },
-                new PrioritySelector<IBotState>(
-                    new If<IBotState>(
-                        s => s.Target!.Value.Distance > s.Routine.PullRange,
-                        new Do<IBotState>(s =>
-                            s.MoveTo(s.Target!.Value.Position) ? RunStatus.Running : RunStatus.Failure)
-                        { Name = "Approach" }),
-
-                    new Do<IBotState>(s =>
-                    {
-                        s.StopMoving();
-                        s.Routine.PetControl(s.Combat);
-                        s.Routine.Pull(s.Combat);
-                        return RunStatus.Running;
-                    })
-                    { Name = "Pull" })
-                { Name = "Engage" })
-            { Name = "Has a target" },
+            // Something already selected and alive: close on it and start the fight.
+            Engagement.Build(),
 
             // Nothing selected: pick something.
             new Do<IBotState>(state =>

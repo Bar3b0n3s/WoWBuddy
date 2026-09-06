@@ -105,6 +105,7 @@ public sealed record ProfileBlackspot(Vector3 Position, float Radius, int MapId 
 /// <param name="Count">How many are needed, where the profile says.</param>
 /// <param name="ItemId">The item collected or used.</param>
 /// <param name="Radius">How far around the position to work, in yards.</param>
+/// <param name="RewardIndex">Which quest reward to take, 1-based, or 0 for no choice.</param>
 /// <param name="Conditions">Every one of these must hold for the step to run.</param>
 /// <param name="BehaviorName">The scripted behaviour to run, for custom steps.</param>
 /// <param name="Arguments">Whatever attributes that behaviour was given.</param>
@@ -123,6 +124,7 @@ public sealed record ProfileStep(
     int Count = 0,
     uint ItemId = 0,
     float Radius = 0f,
+    int RewardIndex = 0,
     IReadOnlyList<ProfileCondition>? Conditions = null,
     string BehaviorName = "",
     IReadOnlyDictionary<string, string>? Arguments = null,
