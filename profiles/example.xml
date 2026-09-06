@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  A tour of the WoWBuddy profile format.
+
+  The ids and coordinates below are invented. This file is a reference for the format, not a
+  profile you can run: WoWBuddy ships no Blizzard data, so the real quest ids, creature entries
+  and positions have to come from you. See docs/profiles.md.
+-->
+<Profile Name="Example" Author="you" Faction="Alliance" MinLevel="1" MaxLevel="10">
+
+  <!-- Where the bot can sell, repair and post. Errands walk to the nearest one on this map. -->
+  <Vendors>
+    <Vendor Name="General goods" Entry="8300" Map="0" X="1500" Y="-2500" Z="60" Repair="true" />
+    <Mailbox Name="Village mailbox" Entry="8400" Map="0" X="1510" Y="-2510" Z="60" />
+  </Vendors>
+
+  <!-- Places never to walk into, whatever the pathfinder says. -->
+  <Blackspots>
+    <Blackspot Map="0" X="1600" Y="-2600" Z="60" Radius="40" Reason="elite patrol route" />
+  </Blackspots>
+
+  <!-- Creatures never to attack, even when they are in the way. -->
+  <AvoidMobs>
+    <Mob Entry="8500" Name="Something Nasty" />
+  </AvoidMobs>
+
+  <QuestOrder>
+
+    <!-- Take a quest. Entry names the giver; X/Y/Z say where it stands. Give at least one. -->
+    <PickUp QuestId="9001" QuestName="Wolves at the Door" Entry="8100" Map="0" X="1500" Y="-2500" Z="60" />
+
+    <!-- Work an objective. Type tells the bot how; leave it out and it works the area and
+         watches the quest log instead. Index picks one of a quest's objectives, 1-based. -->
+    <Objective QuestId="9001" Type="Kill" Entry="8200" Index="1" Count="8"
+               Map="0" X="1560" Y="-2460" Z="60" Radius="80" />
+
+    <!-- An objective can range over several spots instead of one. -->
+    <Objective QuestId="9001" Type="Collect" ItemId="8600" Index="2" Count="6" Map="0" Radius="60">
+      <Hotspot X="1560" Y="-2460" Z="60" />
+      <Hotspot X="1580" Y="-2420" Z="60" />
+    </Objective>
+
+    <TurnIn QuestId="9001" Entry="8100" Map="0" X="1500" Y="-2500" Z="60" />
+
+    <!-- Conditions gate a step. Every clause of an && must hold. -->
+    <PickUp QuestId="9002" Entry="8100" Map="0" X="1500" Y="-2500" Z="60"
+            Condition="Level >= 5 &amp;&amp; !QuestCompleted(9002)" />
+
+    <!-- An If wraps its conditions around everything inside it. It is not a step of its own:
+         the loader folds the condition onto each child. -->
+    <If Condition="QuestInLog(9002)">
+      <Objective QuestId="9002" Type="Interact" Entry="8700" Map="0" X="1620" Y="-2480" Z="60" />
+      <TurnIn QuestId="9002" Entry="8100" Map="0" X="1500" Y="-2500" Z="60" />
+    </If>
+
+    <!-- A While really does loop, so it needs a condition that will stop being true. -->
+    <While Condition="Level &lt; 10">
+      <Grind Map="0" X="1560" Y="-2460" Z="60" Radius="120" Condition="Level &lt; 10" />
+    </While>
+
+    <!-- Just walk somewhere. -->
+    <RunTo Map="0" X="1700" Y="-2300" Z="62" />
+
+    <!-- Hand off to a behaviour registered in code. Every other attribute is passed through. -->
+    <CustomBehavior Name="WaitTimer" WaitTime="5000" GoalText="waiting for the boat" />
+
+  </QuestOrder>
+</Profile>

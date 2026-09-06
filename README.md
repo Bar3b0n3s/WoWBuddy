@@ -65,7 +65,8 @@ covers extracting navigation data and [docs/phase-3-manual-test.md](docs/phase-3
 covers confirming click-to-move before anything writes to it,
 [docs/phase-4-manual-test.md](docs/phase-4-manual-test.md) covers combat, and
 [docs/phase-5-manual-test.md](docs/phase-5-manual-test.md) covers looting, gear and the
-scheduler. [docs/world-data.md](docs/world-data.md) covers how the bot learns where things are.
+scheduler. [docs/world-data.md](docs/world-data.md) covers how the bot learns where things are, and
+[docs/profiles.md](docs/profiles.md) covers the profile format the questing base reads.
 
 ## How this project handles low-level facts
 
@@ -114,10 +115,12 @@ src/WorldData    The world map the bot learns by playing, and optional database 
 src/Behavior     Behaviour tree engine
 src/CombatRoutines  Rotation engine and per-specialisation routines
 src/BotBases     Root behaviour tree and the grind base
+src/Profiles     Profile model, loader and validator
 src/UI           WPF shell
 tools/Inspector  Read-only console dev tool
 tests/           Unit tests, including a simulated client
 docs/            Setup, architecture, offsets, licensing, manual test scripts
+profiles/        Profile format reference (no game data; ids are invented)
 ```
 
 ## Contributing

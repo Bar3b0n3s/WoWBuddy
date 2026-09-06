@@ -11,6 +11,7 @@ using WoWBuddy.GameApi;
 using WoWBuddy.GameApi.Objects;
 using WoWBuddy.Navigation;
 using WoWBuddy.Navigation.Data;
+using WoWBuddy.Profiles;
 using WoWBuddy.WorldData;
 
 namespace WoWBuddy.Inspector;
@@ -55,6 +56,7 @@ public static class Program
                 "ctm" => ReadClickToMove(args),
                 "nav" => CheckNavigationData(args),
                 "worlddata" => CheckWorldData(args),
+                "profile" => CheckProfile(args),
                 "help" or "--help" or "-h" => ShowHelp(),
                 _ => ShowUnknownCommand(command),
             };
@@ -93,6 +95,10 @@ public static class Program
               worlddata <dir> [--find TEXT]
                                 Check world data exported from your server database,
                                 and search it for node types by name.
+
+              profile check <file.xml>
+                                Read a profile and report everything wrong with it.
+                                Needs no game client.
 
               help              Show this text.
 
@@ -614,4 +620,70 @@ public static class Program
 
         Console.WriteLine();
     }
+
+    /// <summary>
+    /// Reads a profile and prints the loader's report.
+    /// </summary>
+    /// <remarks>
+    /// Needs no game client. A questing profile plays out over hours, so being able to check
+    /// one in a second before starting is worth a command of its own.
+    /// </remarks>
+    private static int CheckProfile(string[] args)
+    {
+        if (args.Length < 3
+            || !string.Equals(args[1], "check", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.Error.WriteLine("Usage: profile check <file.xml>");
+            Console.Error.WriteLine("See docs/profiles.md for the format.");
+            return 2;
+        }
+
+        string path = args[2];
+        ProfileLoadResult result = ProfileLoader.LoadFile(path);
+
+        Console.WriteLine(result.Describe());
+        Console.WriteLine();
+
+        if (result.Profile is null)
+        {
+            Console.WriteLine("The profile could not be read at all.");
+            return 1;
+        }
+
+        Profile profile = result.Profile;
+
+        Console.WriteLine($"Name       : {profile.Name}");
+        Console.WriteLine($"Author     : {(profile.Author.Length > 0 ? profile.Author : "(none given)")}");
+        Console.WriteLine($"Faction    : {profile.Faction}");
+        Console.WriteLine($"Levels     : {profile.MinimumLevel}-{profile.MaximumLevel}");
+        Console.WriteLine($"Steps      : {profile.AllSteps().Count()} ({profile.Steps.Count} at the top level)");
+        Console.WriteLine($"Vendors    : {profile.Vendors.Count}");
+        Console.WriteLine($"Blackspots : {profile.Blackspots.Count}");
+        Console.WriteLine($"Avoid mobs : {profile.AvoidMobs.Count}");
+        Console.WriteLine();
+
+        foreach (IGrouping<StepKind, ProfileStep> group in profile.AllSteps().GroupBy(step => step.Kind))
+        {
+            Console.WriteLine($"  {group.Key,-15} {group.Count(),4}");
+        }
+
+        int unknownObjectives = profile.AllSteps()
+            .Count(step => step.Kind == StepKind.Objective && step.Objective == ObjectiveKind.Unknown);
+
+        if (unknownObjectives > 0)
+        {
+            Console.WriteLine();
+            Console.WriteLine(
+                $"{unknownObjectives} objective(s) have no type the bot knows. It will work the "
+                + "area and watch the quest log for those.");
+        }
+
+        Console.WriteLine();
+        Console.WriteLine(result.Success
+            ? "The profile is usable."
+            : "The profile cannot be run until the errors above are fixed.");
+
+        return result.Success ? 0 : 1;
+    }
+
 }
