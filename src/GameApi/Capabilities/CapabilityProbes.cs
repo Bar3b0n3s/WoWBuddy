@@ -78,13 +78,18 @@ public static class CapabilityProbes
             ExpectedAbsent: true),
 
         new(GameCapability.Inventory,
-            ["GetItemCount", "GetContainerNumSlots", "GetContainerItemLink"],
+            // Exactly what LuaInventory calls.
+            ["GetItemCount", "GetContainerNumSlots", "GetContainerItemLink", "GetMoney",
+             "GetInventoryItemDurability"],
             "counting what the character is carrying",
             "Collect objectives and item conditions cannot be answered, and bag management "
             + "falls back to what the bot can see in memory."),
 
+        // UseContainerItem rather than UseItemByName: a profile names an item by id, and
+        // turning an id into a name would need item data this project does not ship. Finding
+        // the bag slot holding that id needs nothing but the bags themselves.
         new(GameCapability.UseItem,
-            ["UseItemByName"],
+            ["UseContainerItem"],
             "using an item from the bags",
             "UseItem objectives cannot run."),
 
