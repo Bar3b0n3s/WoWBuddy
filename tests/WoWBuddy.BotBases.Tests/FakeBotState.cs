@@ -207,6 +207,15 @@ public sealed class FakeBotState : IBotState
         return true;
     }
 
+    /// <summary>Whether the bags hold anything a vendor would pay for.</summary>
+    public bool HasSellableItems { get; set; } = true;
+
+    public void EndErrand()
+    {
+        Actions.Add($"EndErrand({CurrentErrand})");
+        CurrentErrand = Errand.None;
+    }
+
     public bool BeginErrand(Errand errand)
     {
         Actions.Add($"BeginErrand({errand})");

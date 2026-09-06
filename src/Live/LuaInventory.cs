@@ -148,6 +148,33 @@ public sealed class LuaInventory
         return used;
     }
 
+    /// <summary>
+    /// True when the bags hold anything a vendor would pay for.
+    /// </summary>
+    /// <remarks>
+    /// Asked before walking to town. Full bags of quest items and soulbound gear are not a
+    /// reason to go, and a bot that went anyway would make the trip over and over without ever
+    /// freeing a slot. Not cached: it is asked once per errand decision, and the answer changes
+    /// with every loot.
+    /// </remarks>
+    public bool HasSellableItems()
+    {
+        if (!Supports(GameCapability.Inventory))
+        {
+            // Unknown means no, because the failure this protects against is a wasted trip.
+            return false;
+        }
+
+        return _lua.EvaluateBool(
+            "(function() for bag = 0, 4 do "
+            + "for slot = 1, (GetContainerNumSlots(bag) or 0) do "
+            + "local link = GetContainerItemLink(bag, slot) "
+            + "if link then "
+            + "local _, _, quality, _, _, class, _, _, _, _, price = GetItemInfo(link) "
+            + "if price and price > 0 and class ~= \"Quest\" then return true end "
+            + "end end end return false end)()");
+    }
+
     /// <summary>Forgets the last reading, for after looting or selling.</summary>
     public void Invalidate() => _readAt = DateTimeOffset.MinValue;
 

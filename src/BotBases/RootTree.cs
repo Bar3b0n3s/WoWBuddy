@@ -41,7 +41,14 @@ public static class RootTree
     /// <param name="errands">
     /// Decides when to break off for a vendor, repair or trainer. Omit to disable errands.
     /// </param>
-    public static BehaviorTree<IBotState> Build(Node<IBotState> botBase, ErrandPlanner? errands = null)
+    /// <param name="errandHandler">
+    /// Carries an errand out: walks to the vendor, sells, repairs, posts the mail. Omit and
+    /// errands are never started, because beginning one nothing can finish would stop the bot.
+    /// </param>
+    public static BehaviorTree<IBotState> Build(
+        Node<IBotState> botBase,
+        ErrandPlanner? errands = null,
+        Node<IBotState>? errandHandler = null)
     {
         ArgumentNullException.ThrowIfNull(botBase);
 
@@ -80,7 +87,7 @@ public static class RootTree
                 HandleLooting(),
 
                 HandleRest(),
-                HandleErrands(errands),
+                HandleErrands(errands, errandHandler),
 
                 new If<IBotState>(_ => true, botBase) { Name = "Bot base" },
 
@@ -159,34 +166,59 @@ public static class RootTree
     /// at low health arrives dead. Above the bot base because carrying on grinding with full
     /// bags and broken gear accomplishes nothing.
     /// </remarks>
-    public static Node<IBotState> HandleErrands(ErrandPlanner? errands)
+    public static Node<IBotState> HandleErrands(
+        ErrandPlanner? errands,
+        Node<IBotState>? errandHandler = null)
     {
-        if (errands is null)
+        // Errands need both halves: something to decide one is due, and something to carry it
+        // out. With either missing there is nothing to run, and beginning an errand that
+        // nothing can finish would leave the character standing still indefinitely.
+        if (errands is null || errandHandler is null)
         {
             return new Check<IBotState>(_ => false) { Name = "Errands disabled" };
         }
 
         return new If<IBotState>(
-            s => !s.IsInCombat
-                 && (s.CurrentErrand != Errand.None
-                     || errands.Next(s.Inventory, s.Level, hasSellableItems: true) != Errand.None),
+            s => !s.IsInCombat && Due(s, errands) != Errand.None,
             new Do<IBotState>(s =>
             {
-                if (s.CurrentErrand != Errand.None)
+                if (s.CurrentErrand == Errand.None)
+                {
+                    Errand due = Due(s, errands);
+
+                    // The bot may simply not know where to go, which is the normal state until
+                    // a profile supplies vendor locations. Failing hands control back to the
+                    // bot base rather than stalling.
+                    if (!s.BeginErrand(due))
+                    {
+                        return RunStatus.Failure;
+                    }
+                }
+
+                RunStatus status = errandHandler.Tick(s);
+
+                if (status == RunStatus.Running)
                 {
                     return RunStatus.Running;
                 }
 
-                Errand due = errands.Next(s.Inventory, s.Level, hasSellableItems: true);
+                // Done, or given up on. Either way the errand is over: an errand that stayed
+                // current after its handler stopped working on it would hold the bot forever.
+                s.EndErrand();
 
-                // The bot may simply not know where to go, which is the normal state until a
-                // profile supplies vendor locations. Failing hands control back to the bot
-                // base rather than stalling.
-                return s.BeginErrand(due) ? RunStatus.Running : RunStatus.Failure;
+                // Failure rather than success, so the bot base gets this tick instead of the
+                // character standing still until the next one.
+                return RunStatus.Failure;
             })
             { Name = "Run an errand" })
         { Name = "Handle errands" };
     }
+
+    /// <summary>The errand in progress, or the one now due.</summary>
+    private static Errand Due(IBotState state, ErrandPlanner errands) =>
+        state.CurrentErrand != Errand.None
+            ? state.CurrentErrand
+            : errands.Next(state.Inventory, state.Level, state.HasSellableItems);
 
     /// <summary>
     /// Dying, releasing, walking back and reclaiming the body.

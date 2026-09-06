@@ -171,6 +171,26 @@ public interface IBotState
     /// </remarks>
     bool BeginErrand(Errand errand);
 
+    /// <summary>
+    /// Finishes the current errand, whether it was completed or given up on.
+    /// </summary>
+    /// <remarks>
+    /// Every errand must end. Without this an errand begins, the branch above the bot base
+    /// reports that it is still running, and the character stands there for the rest of the
+    /// night — which is exactly what happened before this existed.
+    /// </remarks>
+    void EndErrand();
+
+    /// <summary>
+    /// True when the bags hold anything a vendor would pay for.
+    /// </summary>
+    /// <remarks>
+    /// Asked before sending the character to town: full bags of quest items and soulbound gear
+    /// are not a reason to walk to a vendor, and a bot that goes anyway makes the trip over and
+    /// over without ever freeing a slot.
+    /// </remarks>
+    bool HasSellableItems { get; }
+
     // ---- Added in phase 7 -------------------------------------------------------------
 
     /// <summary>The character's quest log, and the verbs for changing it.</summary>

@@ -80,7 +80,7 @@ public static class CapabilityProbes
         new(GameCapability.Inventory,
             // Exactly what LuaInventory calls.
             ["GetItemCount", "GetContainerNumSlots", "GetContainerItemLink", "GetMoney",
-             "GetInventoryItemDurability"],
+             "GetInventoryItemDurability", "GetItemInfo"],
             "counting what the character is carrying",
             "Collect objectives and item conditions cannot be answered, and bag management "
             + "falls back to what the bot can see in memory."),

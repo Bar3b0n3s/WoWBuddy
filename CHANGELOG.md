@@ -29,6 +29,19 @@ zero, anything may change.
   [docs/status.md](docs/status.md) for what that means in practice.
 - A crafting bot base, and buying materials for one.
 
+### Fixed
+
+- **Errands no longer deadlock the bot.** An errand began, the branch above the bot base
+  reported it was still running, and nothing anywhere ever cleared it — so the character stood
+  still permanently the first time its bags filled or its gear wore down. `IBotState` gained
+  `EndErrand`, the errand branch now requires a handler that carries the errand out, and every
+  path through it ends the errand and hands control back.
+- **The bot no longer walks to town with nothing to sell.** The "has anything worth selling"
+  question was hardcoded to yes, making the check in `ErrandPlanner` dead code. `IBotState`
+  gained `HasSellableItems`, answered from the bags.
+- A flaky logging test. The logger is process-wide static state and the test tore it down while
+  other tests in the same assembly were writing to it.
+
 ## [0.9.0] — 2026-09-06
 
 First packaged release. **A preview: the bot can read a client and decide what to do, but

@@ -243,6 +243,21 @@ public sealed class LiveBotState : IBotState, IProfileConditionContext
     }
 
     /// <inheritdoc />
+    public void EndErrand()
+    {
+        if (_errand == Errand.None)
+        {
+            return;
+        }
+
+        Log.For<LiveBotState>().Information("Errand finished: {Errand}", _errand);
+        _errand = Errand.None;
+    }
+
+    /// <inheritdoc />
+    public bool HasSellableItems => _inventory.HasSellableItems();
+
+    /// <inheritdoc />
     public int ItemCount(uint itemId) => _inventory.Count(itemId);
 
     /// <inheritdoc />

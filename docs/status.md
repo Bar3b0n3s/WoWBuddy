@@ -70,6 +70,18 @@ unselectable or pacified units, then treats the rest as fair game. It will offer
 critter as a target. A profile's avoid list is the intended cover, and a user with faction data
 can supply a better rule.
 
+### Errands are decided but never carried out
+
+`ErrandPlanner` works out when the character should go and repair, sell, mail or train.
+Nothing performs any of it — there is no vendor interaction, no `RepairAllItems`, no selling,
+no mail.
+
+So `RootTree.Build` takes an errand handler, and **without one the errand branch is off
+entirely**. That is deliberate rather than a stopgap: beginning an errand nothing can finish is
+worse than not starting one, and it is exactly what used to happen — the branch reported that
+it was still working, sat above the bot base, and the character stood still for the rest of the
+night the first time its bags filled.
+
 ### No crafting bot base
 
 Phase 9 is mostly done: the activity scheduler mixes activities within a session, opportunistic
