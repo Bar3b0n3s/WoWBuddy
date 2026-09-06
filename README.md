@@ -122,6 +122,7 @@ src/CombatRoutines  Rotation engine and per-specialisation routines
 src/BotBases     Root behaviour tree and the grind base
 src/Profiles     Profile model, loader and validator
 src/Plugins      Plugin contract, loader and manager
+src/Presentation View models and the bot base factory, testable off Windows
 src/UI           WPF shell
 tools/Inspector  Read-only console dev tool
 tests/           Unit tests, including a simulated client

@@ -15,6 +15,9 @@
     <ProjectReference Include="..\Common\WoWBuddy.Common.csproj" />
     <ProjectReference Include="..\Core\WoWBuddy.Core.csproj" />
     <ProjectReference Include="..\GameApi\WoWBuddy.GameApi.csproj" />
+    <ProjectReference Include="..\Plugins\WoWBuddy.Plugins.csproj" />
+    <ProjectReference Include="..\Presentation\WoWBuddy.Presentation.csproj" />
+    <ProjectReference Include="..\Profiles\WoWBuddy.Profiles.csproj" />
   </ItemGroup>
 
 </Project>

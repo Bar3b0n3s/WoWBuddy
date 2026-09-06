@@ -10,6 +10,7 @@
       "src\\GameApi\\WoWBuddy.GameApi.csproj",
       "src\\Navigation\\WoWBuddy.Navigation.csproj",
       "src\\Plugins\\WoWBuddy.Plugins.csproj",
+      "src\\Presentation\\WoWBuddy.Presentation.csproj",
       "src\\Profiles\\WoWBuddy.Profiles.csproj",
       "src\\WorldData\\WoWBuddy.WorldData.csproj",
       "tests\\WoWBuddy.Behavior.Tests\\WoWBuddy.Behavior.Tests.csproj",
@@ -19,6 +20,7 @@
       "tests\\WoWBuddy.Core.Tests\\WoWBuddy.Core.Tests.csproj",
       "tests\\WoWBuddy.Navigation.Tests\\WoWBuddy.Navigation.Tests.csproj",
       "tests\\WoWBuddy.Plugins.Tests\\WoWBuddy.Plugins.Tests.csproj",
+      "tests\\WoWBuddy.Presentation.Tests\\WoWBuddy.Presentation.Tests.csproj",
       "tests\\WoWBuddy.Profiles.Tests\\WoWBuddy.Profiles.Tests.csproj",
       "tests\\WoWBuddy.WorldData.Tests\\WoWBuddy.WorldData.Tests.csproj",
       "tools\\WoWBuddy.Inspector\\WoWBuddy.Inspector.csproj"

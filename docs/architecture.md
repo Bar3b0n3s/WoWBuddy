@@ -121,6 +121,39 @@ Handle death → Handle stuck → Combat → Rest → Loot/gather → Bot base �
 
 Bot bases and combat routines contribute subtrees; plugins hook `OnPulse` and the event bus.
 
+## The window, and what it is not
+
+The UI is split in two. `src/Presentation` holds every decision the window makes — which
+clients were found, whether attaching is allowed, whether the chosen profile loads, which bot
+base to build — and mentions no WPF type at all. `src/UI` is the XAML and the four small classes
+that translate between the core and the window.
+
+That split is not tidiness. The rules about what the user may do next are exactly the part of a
+UI that goes wrong, and they are checkable only if a test can reach them. Attaching twice,
+attaching to a build the offsets do not fit, starting a questing base with a profile that will
+not load — all of those are decisions with tests, and none of them needs Windows to run. This
+repository's CI builds and tests the presentation layer on Linux; only the XAML needs a Windows
+machine.
+
+## The gap: nothing implements IBotState against a live client
+
+**This is the largest remaining piece of work, and it is worth being blunt about.**
+
+Six bot bases, thirty combat routines, the behaviour tree, profiles, questing, group play and
+battlegrounds are all written against `IBotState` and tested against a fake implementation of
+it. Nothing yet implements it against a running client.
+
+Doing so means reading, from a real 3.3.5a client: the quest log and its objectives, the party
+and its members' health and targets, bag contents and item counts, the battleground queue, and
+the verbs that go with them. A good deal of that is Lua this project has not verified — see the
+manual test scripts for [phase 7](phase-7-manual-test.md) and
+[phase 8](phase-8-manual-test.md), which exist precisely to check it.
+
+Until that adapter exists, the Start button builds the tree — which is real, and is where a
+profile that does not give a bot base what it needs is caught — and then says plainly that it
+cannot play. **A start button that ticked a tree fed on invented values would look like progress
+and be worth less than nothing.**
+
 ## Failure policy
 
 On an unhandled exception the bot stops and leaves the character standing. It never keeps

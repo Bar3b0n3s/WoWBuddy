@@ -1,6 +1,11 @@
+using System;
+using System.IO;
 using System.Windows;
 using System.Windows.Threading;
+using WoWBuddy.CombatRoutines;
 using WoWBuddy.Common.Logging;
+using WoWBuddy.Plugins;
+using WoWBuddy.Presentation;
 
 namespace WoWBuddy.UI;
 
@@ -14,9 +19,12 @@ namespace WoWBuddy.UI;
 /// </remarks>
 public partial class App : Application
 {
+    private PluginManager? _plugins;
+
     protected override void OnStartup(StartupEventArgs e)
     {
-        Log.Initialise();
+        MainViewModel model = Compose();
+
         Log.For<App>().Information("WoWBuddy starting");
 
         DispatcherUnhandledException += OnUnhandledException;
@@ -24,10 +32,59 @@ public partial class App : Application
             Log.For<App>().Fatal(args.ExceptionObject as Exception, "Unhandled exception on a background thread");
 
         base.OnStartup(e);
+
+        new MainWindow(model).Show();
+    }
+
+    /// <summary>
+    /// Builds everything the window needs, in the order it has to be built.
+    /// </summary>
+    /// <remarks>
+    /// Written out rather than done with a container. There are six things here, they are
+    /// constructed once, and a list of six constructor calls is easier to follow than the
+    /// registrations that would replace it.
+    /// </remarks>
+    private MainViewModel Compose()
+    {
+        LogBuffer buffer = new();
+
+        // The window's log panel is a second sink rather than a second logger, so what it
+        // shows and what the file records cannot drift apart.
+        Log.Initialise(extraSink: new LogSink(buffer));
+
+        RoutineCatalogue routines = new();
+
+        string pluginRoot = Path.Combine(AppContext.BaseDirectory, "Plugins");
+
+        _plugins = new PluginManager(new PluginHost(routines, pluginRoot));
+
+        PluginLoadResult loaded = new PluginLoader(_plugins).LoadDirectory(pluginRoot, routines);
+
+        foreach (string problem in loaded.Problems)
+        {
+            Log.For<App>().Warning("{Problem}", problem);
+        }
+
+        MainViewModel model = new(
+            new WowClientDiscovery(),
+            new BotController(),
+            routines,
+            _plugins);
+
+        // The buffer the window binds to is the one the sink writes into, so lines logged
+        // during start-up above are already there when the window opens.
+        foreach (LogLine line in buffer.Lines)
+        {
+            model.Log.Add(line);
+        }
+
+        return model;
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _plugins?.Shutdown();
+
         Log.For<App>().Information("WoWBuddy exiting");
         Log.Shutdown();
         base.OnExit(e);

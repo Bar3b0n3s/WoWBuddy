@@ -36,7 +36,12 @@ public static class Log
     /// <param name="logDirectory">
     /// Directory for rolling log files. Defaults to a <c>logs</c> folder beside the executable.
     /// </param>
-    public static void Initialise(string? logDirectory = null)
+    /// <param name="logDirectory">Where the files go. Defaults to a folder beside the executable.</param>
+    /// <param name="extraSink">
+    /// Somewhere else to send every line, such as the window's log panel. Optional so that the
+    /// console tools and the tests are unaffected by it.
+    /// </param>
+    public static void Initialise(string? logDirectory = null, ILogEventSink? extraSink = null)
     {
         if (_initialised)
         {
@@ -49,7 +54,7 @@ public static class Log
         const string template =
             "[{Timestamp:HH:mm:ss.fff} {Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}";
 
-        _logger = new LoggerConfiguration()
+        LoggerConfiguration configuration = new LoggerConfiguration()
             .MinimumLevel.ControlledBy(LevelSwitch)
             .Enrich.FromLogContext()
             .WriteTo.Console(outputTemplate: template)
@@ -58,8 +63,16 @@ public static class Log
                 rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: 14,
                 outputTemplate: template,
-                shared: true)
-            .CreateLogger();
+                shared: true);
+
+        if (extraSink is not null)
+        {
+            // A second sink rather than a second logger, so what the window shows and what the
+            // file records cannot drift apart.
+            configuration = configuration.WriteTo.Sink(extraSink);
+        }
+
+        _logger = configuration.CreateLogger();
 
         Serilog.Log.Logger = _logger;
         _initialised = true;
