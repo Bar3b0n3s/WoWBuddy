@@ -1,0 +1,29 @@
+<Project>
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <!--
+    Licence policy: only permissive licences (MIT / BSD / Apache-2.0 / zlib) may
+    be referenced. Anything copyleft is a build-breaking mistake, not a warning.
+    See docs/legal-and-licensing.md.
+  -->
+  <ItemGroup>
+    <!-- Serilog and sinks: Apache-2.0 -->
+    <PackageVersion Include="Serilog" Version="4.1.0" />
+    <PackageVersion Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <PackageVersion Include="Serilog.Sinks.File" Version="6.0.0" />
+    <!-- Microsoft.Extensions.*: MIT -->
+    <PackageVersion Include="Microsoft.Extensions.ObjectPool" Version="8.0.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Test-only. xunit: Apache-2.0. -->
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageVersion Include="xunit" Version="2.9.2" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+</Project>

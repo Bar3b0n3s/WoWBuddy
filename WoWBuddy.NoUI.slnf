@@ -1,0 +1,13 @@
+{
+  "solution": {
+    "path": "WoWBuddy.sln",
+    "projects": [
+      "src\\Common\\WoWBuddy.Common.csproj",
+      "src\\Core\\WoWBuddy.Core.csproj",
+      "src\\GameApi\\WoWBuddy.GameApi.csproj",
+      "tools\\WoWBuddy.Inspector\\WoWBuddy.Inspector.csproj",
+      "tests\\WoWBuddy.Common.Tests\\WoWBuddy.Common.Tests.csproj",
+      "tests\\WoWBuddy.Core.Tests\\WoWBuddy.Core.Tests.csproj"
+    ]
+  }
+}

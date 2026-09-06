@@ -1,0 +1,43 @@
+<Project>
+
+  <!--
+    Imported AFTER each project's own body, unlike Directory.Build.props. That ordering
+    matters: a project sets WoWBuddyClientHost in its own PropertyGroup, so a condition on it
+    in Directory.Build.props would be evaluated before the value existed and would silently
+    never fire.
+  -->
+
+  <!--
+    The game client is a 32-bit process, so any program that attaches to it is built x86.
+
+    This is set on executables only, not on the libraries they reference. In .NET, process
+    bitness is decided by the entry executable; PlatformTarget on a library only sets a PE
+    flag that the runtime ignores for non-entry assemblies. Forcing it on libraries would buy
+    nothing and would make them awkward to load into the x64 test host.
+
+    Pointer width is handled in code rather than by bitness: the client's pointers are always
+    read as exactly four bytes (see MemoryReaderExtensions.TryReadPointer), so reads are
+    correct regardless of what the bot itself was built as. Being x86 matters from phase 2,
+    where the injected payload must match the client and a matching host makes injection and
+    the shared-memory bridge markedly simpler.
+
+    Applied on Windows only: the x86 apphost pack is not available elsewhere, and the
+    non-Windows build exists purely for a fast CI signal, never to run.
+  -->
+  <PropertyGroup Condition="'$(WoWBuddyClientHost)' == 'true' AND '$([MSBuild]::IsOSPlatform(Windows))' == 'true'">
+    <PlatformTarget>x86</PlatformTarget>
+  </PropertyGroup>
+
+  <!--
+    Guard against the mistake this file exists to fix. If an executable declares that it
+    attaches to the client but did not end up x86 on Windows, fail the build rather than
+    shipping a 64-bit host that cannot load an x86 payload in phase 2.
+  -->
+  <Target Name="WoWBuddyVerifyClientHostBitness"
+          BeforeTargets="CoreCompile"
+          Condition="'$(WoWBuddyClientHost)' == 'true' AND '$([MSBuild]::IsOSPlatform(Windows))' == 'true'">
+    <Error Condition="'$(PlatformTarget)' != 'x86'"
+           Text="$(MSBuildProjectName) sets WoWBuddyClientHost but resolved PlatformTarget='$(PlatformTarget)'. A program that attaches to the 32-bit game client must be built x86." />
+  </Target>
+
+</Project>

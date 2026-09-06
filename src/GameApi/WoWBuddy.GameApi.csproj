@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RootNamespace>WoWBuddy.GameApi</RootNamespace>
+    <AssemblyName>WoWBuddy.GameApi</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Common\WoWBuddy.Common.csproj" />
+    <ProjectReference Include="..\Core\WoWBuddy.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="WoWBuddy.GameApi.Tests" />
+  </ItemGroup>
+
+</Project>

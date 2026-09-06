@@ -1,0 +1,61 @@
+## Build output
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Rider / VS / VS Code
+.vs/
+.idea/
+.vscode/
+*.DotSettings.user
+
+## NuGet
+*.nupkg
+*.snupkg
+packages/
+.nuget/
+
+## Test output
+[Tt]est[Rr]esult*/
+coverage*.json
+coverage*.xml
+*.coverage
+*.trx
+
+## Runtime data produced by the bot on the user's machine.
+## None of this may ever be committed: it is derived from the user's own
+## game client and may contain account identifiers.
+/logs/
+/Logs/
+*.log
+/config/
+/Settings/
+/Profiles/**/*.local.xml
+/mmaps/
+/vmaps/
+/maps/
+/dbc/
+*.mmap
+*.mmtile
+*.vmtile
+*.vmtree
+*.dbc
+*.mpq
+*.wdt
+*.adt
+*.m2
+*.wmo
+
+## Credentials — the DPAPI blob store must never leave the machine.
+*.dpapi
+credentials.dat
+
+## OS
+Thumbs.db
+.DS_Store

@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>WoWBuddy.UI</RootNamespace>
+    <AssemblyName>WoWBuddy</AssemblyName>
+    <!-- Attaches to the 32-bit client, so the host process is built x86. -->
+    <WoWBuddyClientHost>true</WoWBuddyClientHost>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Common\WoWBuddy.Common.csproj" />
+    <ProjectReference Include="..\Core\WoWBuddy.Core.csproj" />
+    <ProjectReference Include="..\GameApi\WoWBuddy.GameApi.csproj" />
+  </ItemGroup>
+
+</Project>
