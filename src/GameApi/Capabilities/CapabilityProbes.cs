@@ -61,9 +61,9 @@ public static class CapabilityProbes
             // Exactly what LuaPartyState's read script calls, and nothing else: probing for a
             // function the bot never uses would switch a feature off for no reason, and using
             // one it never probed is how a feature fails at three in the morning instead.
-            ["GetNumPartyMembers", "UnitGUID", "UnitName", "UnitHealth", "UnitHealthMax",
-             "UnitIsDeadOrGhost", "UnitIsConnected", "UnitIsPartyLeader", "UnitAffectingCombat",
-             "IsInInstance", "FollowUnit"],
+            ["GetNumPartyMembers", "GetNumRaidMembers", "UnitGUID", "UnitName", "UnitIsUnit",
+             "UnitHealth", "UnitHealthMax", "UnitIsDeadOrGhost", "UnitIsConnected",
+             "UnitIsPartyLeader", "UnitAffectingCombat", "IsInInstance", "FollowUnit"],
             "seeing who else is in the group",
             "The dungeon base cannot follow, assist or heal anyone but itself."),
 

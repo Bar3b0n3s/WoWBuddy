@@ -100,7 +100,7 @@ public sealed class FakeLua : ILuaEvaluator
         lua.With(
             "GetNumQuestLogEntries", "GetQuestLogTitle", "SelectQuestLogEntry", "GetQuestLink",
             "GetQuestLogLeaderBoard", "GetNumQuestLeaderBoards", "AcceptQuest", "CompleteQuest", "GetQuestReward",
-            "GetNumQuestChoices", "GetNumPartyMembers", "UnitGUID", "UnitHealth",
+            "GetNumQuestChoices", "GetNumPartyMembers", "GetNumRaidMembers", "UnitGUID", "UnitIsUnit", "UnitHealth",
             "UnitHealthMax", "UnitName", "UnitIsDeadOrGhost", "UnitIsConnected",
             "UnitIsPartyLeader", "UnitAffectingCombat", "IsInInstance", "FollowUnit", "GetItemCount", "GetContainerNumSlots",
             "GetContainerItemLink", "GetMoney", "GetInventoryItemDurability", "GetItemInfo", "UseContainerItem", "GetBattlefieldStatus", "GetBattlefieldWinner",

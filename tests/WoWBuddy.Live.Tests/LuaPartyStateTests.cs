@@ -275,7 +275,46 @@ public sealed class LuaPartyStateTests
     {
         // 3.3.5a counts the party as the members other than the character, which is the
         // opposite of later versions. Getting this wrong loses the last member.
-        Assert.Contains("for i = 1, GetNumPartyMembers()", LuaPartyState.ReadScript, StringComparison.Ordinal);
-        Assert.Contains("\"party\" .. i", LuaPartyState.ReadScript, StringComparison.Ordinal);
+        Assert.Contains("GetNumPartyMembers()", LuaPartyState.ReadScript, StringComparison.Ordinal);
+        Assert.Contains("\"party\"", LuaPartyState.ReadScript, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ARaidIsReadFromTheRaidUnitsRatherThanTheParty()
+    {
+        // A character in a raid is also in a party as far as GetNumPartyMembers is concerned,
+        // so the raid check has to come first — otherwise the bot reports four people out of
+        // twenty-five.
+        Assert.Contains("GetNumRaidMembers()", LuaPartyState.ReadScript, StringComparison.Ordinal);
+        Assert.Contains("raid > 0 and raid or", LuaPartyState.ReadScript, StringComparison.Ordinal);
+        Assert.Contains("raid > 0 and \"raid\" or \"party\"", LuaPartyState.ReadScript, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheCharacterIsSkippedInARaidBecauseRaidUnitsIncludeIt()
+    {
+        // party1..N never includes the character; raid1..N does, and without the check it ends
+        // up in its own group list — where a healer would happily heal it twice.
+        Assert.Contains("not UnitIsUnit(unit, \"player\")", LuaPartyState.ReadScript, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ARaidIsReadTheSameWayOnceTheScriptHasRun()
+    {
+        // The rows come back in the same shape whichever set of unit ids produced them.
+        FakeLua lua = FakeLua.Typical335a();
+        lua.Answers["__wowbuddy_result"] = string.Join(Row,
+            Member("raid3", 0x33, "Tank", leader: true),
+            Member("raid7", 0x77, "Healer"));
+
+        LuaPartyState party = Build(lua, new Dictionary<ulong, Vector3>
+        {
+            [0x33] = new Vector3(110f, 100f, 50f),
+            [0x77] = new Vector3(120f, 100f, 50f),
+        });
+
+        Assert.Equal(2, party.Members.Count);
+        Assert.True(party.Follow(new WoWGuid(0x33)));
+        Assert.Contains(lua.Asked, a => a.Contains("FollowUnit(\"raid3\")", StringComparison.Ordinal));
     }
 }

@@ -35,6 +35,20 @@ A tank will not pull while anyone alive and connected is further away than
 would stop the run entirely, and the group's own decision to keep going is not the bot's to
 override.
 
+## Parties and raids
+
+Two sets of unit ids, and they do not behave the same way. 3.3.5a counts the party as the
+members *other than* the character — the opposite of later versions — so `party1` to `partyN`
+never includes them. A raid counts everybody, so `raid1` to `raidN` does, and the character has
+to be skipped explicitly or it ends up in its own group list, where a healer would cheerfully
+heal it twice.
+
+A character in a raid is also in a party as far as `GetNumPartyMembers` is concerned, so the
+raid check comes first. The other way round reports four people out of twenty-five.
+
+Everything above the reader — following, assisting, healing, the dungeon base — sees the same
+shape of data either way and does not know which it came from.
+
 ## Following
 
 Two distances, not one. The bot starts moving past `FollowDistance` and stops at

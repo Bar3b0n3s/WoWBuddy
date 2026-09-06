@@ -49,17 +49,27 @@ public sealed class LuaPartyState : IPartyState
     /// Collects the whole group inside the client and returns it as one string.
     /// </summary>
     /// <remarks>
-    /// 3.3.5a counts the party as the members <em>other than</em> the character, which is the
-    /// opposite of what later versions do; the loop runs from one to that count and the
-    /// character itself is deliberately not in the list. Raid groups use a different set of
-    /// unit ids and are not handled: the dungeon base is written for five-mans.
+    /// <para>
+    /// Two sets of unit ids, and they do not behave the same way. 3.3.5a counts the party as
+    /// the members <em>other than</em> the character — the opposite of later versions — so
+    /// <c>party1</c> to <c>partyN</c> never includes the character. A raid counts everybody, so
+    /// <c>raid1</c> to <c>raidN</c> does include them, and the character has to be skipped
+    /// explicitly or it ends up in its own group list.
+    /// </para>
+    /// <para>
+    /// A character in a raid is also in a party as far as <c>GetNumPartyMembers</c> is
+    /// concerned, so the raid check comes first. Doing it the other way round would report four
+    /// people out of twenty-five.
+    /// </para>
     /// </remarks>
     internal const string ReadScript = """
         local rows = {}
-        for i = 1, GetNumPartyMembers() do
-            local unit = "party" .. i
+        local raid = GetNumRaidMembers() or 0
+        local total = raid > 0 and raid or (GetNumPartyMembers() or 0)
+        for i = 1, total do
+            local unit = (raid > 0 and "raid" or "party") .. i
             local guid = UnitGUID(unit)
-            if guid then
+            if guid and not UnitIsUnit(unit, "player") then
                 local health, healthMax = UnitHealth(unit), UnitHealthMax(unit)
                 local percent = 0
                 if healthMax and healthMax > 0 then percent = (health / healthMax) * 100 end

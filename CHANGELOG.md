@@ -31,6 +31,8 @@ zero, anything may change.
 
 ### Added
 
+- **Raid groups.** Read from the raid unit ids when there are any, with the character skipped
+  because raid units include it and party units do not.
 - **Mounts.** The character gets on for a long journey and off for combat, looting, skinning
   or arrival. Name the mount; blank walks everywhere.
 - **Talent points are spent from a build you write.** `1:3, 1:3, 2:5` — one point per tick, out
