@@ -52,8 +52,14 @@ Only MIT, BSD, Apache-2.0 and zlib licensed packages may be referenced. Current 
 | xunit, xunit.runner.visualstudio (test only) | Apache-2.0 |
 | Microsoft.NET.Test.Sdk (test only) | MIT |
 
-`.github/workflows/licence-check.yml` fails the build if a denied package enters the
-dependency graph.
+This is enforced by `build/check-licences.sh`, run in CI by
+`.github/workflows/licence-check.yml`. It is an **allow-list**, not a deny-list: every
+package in the graph, transitive ones included, must appear in `build/allowed-packages.txt`
+with the licence it was checked under. A deny-list would only catch the copyleft packages
+someone thought to name in advance; an allow-list forces every new dependency past a human
+who has looked at its licence.
+
+Run it yourself with `./build/check-licences.sh`.
 
 ## GPL tools used as external programs
 

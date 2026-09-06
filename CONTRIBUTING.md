@@ -25,7 +25,10 @@ So, when adding anything to `Offsets335a.cs` or `UpdateFields335a.cs`:
 
 ## Licensing rules
 
-- The project is MIT. Only MIT, BSD, Apache-2.0 and zlib dependencies may be linked.
+- The project is MIT. Only MIT, BSD, Apache-2.0 and zlib dependencies may be linked. Adding
+  any package, including one pulled in transitively, means adding it to
+  `build/allowed-packages.txt` with its licence; `./build/check-licences.sh` fails otherwise.
+  That line is you taking responsibility for having checked the licence.
 - **Do not copy code from other bots.** Every 3.3.5a bot surveyed is GPL-3.0, unlicensed
   (all rights reserved), or proprietary. Reading one to learn a factual offset value is fine;
   copying its code, structure, naming or comments is not. See
@@ -59,6 +62,7 @@ The codebase follows the conventions already in it rather than a separate style 
 ```
 dotnet build WoWBuddy.sln -c Release
 dotnet test WoWBuddy.sln -c Release
+./build/check-licences.sh
 ```
 
 If your change touches anything the bot reads from the client, also run the relevant manual

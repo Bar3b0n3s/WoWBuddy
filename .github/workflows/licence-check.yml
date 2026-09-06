@@ -5,16 +5,17 @@ on:
     branches: [ main, master, "claude/**" ]
   pull_request:
     branches: [ main, master ]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
-# The project is MIT and links only permissive dependencies. A copyleft package slipping
-# into the graph would be a licensing problem rather than a build problem, so it gets its
-# own check that fails loudly instead of being noticed years later.
+# WoWBuddy ships under MIT and links only permissive dependencies. A copyleft package
+# entering the graph would be a licensing problem rather than a build problem, so it gets
+# its own check that fails loudly instead of being noticed years later.
 jobs:
   packages:
-    name: No copyleft dependencies
+    name: Dependency licence allow-list
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,20 +28,5 @@ jobs:
       - name: Restore
         run: dotnet restore WoWBuddy.NoUI.slnf
 
-      - name: List resolved packages
-        run: dotnet list WoWBuddy.NoUI.slnf package --include-transitive > packages.txt
-
-      - name: Show resolved packages
-        run: cat packages.txt
-
-      - name: Fail on known copyleft packages
-        shell: bash
-        run: |
-          # Package names known to be GPL/LGPL/AGPL that must never enter the graph.
-          # Kept as an explicit deny list: a name-based heuristic would be noise.
-          DENY='AmeisenBotX|TrinityCore|AzerothCore|MySql\.Data|GPL'
-          if grep -Ei "$DENY" packages.txt; then
-            echo "::error::A copyleft or disallowed package is in the dependency graph."
-            exit 1
-          fi
-          echo "No disallowed packages found."
+      - name: Check every package against the allow-list
+        run: ./build/check-licences.sh

@@ -1,0 +1,37 @@
+# Packages permitted in the dependency graph, with the licence each was checked under.
+#
+# WoWBuddy ships under MIT, so only permissive licences (MIT, BSD, Apache-2.0, zlib) may be
+# linked. Copyleft licences are incompatible with that and must never appear here.
+#
+# This is an allow-list rather than a deny-list on purpose: a deny-list only catches the
+# handful of copyleft packages someone thought to name in advance, whereas an allow-list
+# forces every new dependency, including transitive ones, past a human who has looked at its
+# licence. Adding a line here is the act of taking responsibility for that licence.
+#
+# Format: one package id per line. Blank lines and # comments are ignored.
+
+# Serilog and its sinks - Apache-2.0
+Serilog
+Serilog.Sinks.Console
+Serilog.Sinks.File
+
+# Test-only. xunit - Apache-2.0; Microsoft.NET.Test.Sdk and friends - MIT.
+xunit
+xunit.abstractions
+xunit.analyzers
+xunit.assert
+xunit.core
+xunit.extensibility.core
+xunit.extensibility.execution
+xunit.runner.visualstudio
+Microsoft.NET.Test.Sdk
+Microsoft.CodeCoverage
+Microsoft.TestPlatform.ObjectModel
+Microsoft.TestPlatform.TestHost
+
+# Transitive dependencies of the above - MIT (Microsoft) / Apache-2.0.
+Microsoft.Extensions.ObjectPool
+NuGet.Frameworks
+Newtonsoft.Json
+System.Reflection.Metadata
+System.Collections.Immutable
