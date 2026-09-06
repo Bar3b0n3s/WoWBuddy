@@ -57,6 +57,12 @@ public sealed record BotSettings
     /// <summary>The recipe it makes, or empty for whatever raises the skill fastest.</summary>
     public string CraftRecipe { get; init; } = string.Empty;
 
+    /// <summary>The mount to cast, as the client names it. Empty means walk everywhere.</summary>
+    public string MountName { get; init; } = string.Empty;
+
+    /// <summary>The shortest journey worth mounting for, in yards.</summary>
+    public float MountForJourneysOver { get; init; } = 100f;
+
     /// <summary>
     /// The order to spend talent points in, as <c>tab:index</c> pairs.
     /// </summary>

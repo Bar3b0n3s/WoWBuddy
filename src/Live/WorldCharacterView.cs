@@ -86,6 +86,13 @@ public sealed class WorldCharacterView : ICharacterView
     /// <inheritdoc />
     public bool IsInCombat => _world.Me is { IsInCombat: true };
 
+    /// <summary>True when the character is on a mount.</summary>
+    /// <remarks>
+    /// From the unit flags, which are verified — a better answer than asking the scripting for
+    /// something the object manager already knows.
+    /// </remarks>
+    public bool IsMounted => _world.Me is { IsMounted: true };
+
     /// <inheritdoc />
     public Vector3 Position => _world.Me?.Position ?? Vector3.Zero;
 

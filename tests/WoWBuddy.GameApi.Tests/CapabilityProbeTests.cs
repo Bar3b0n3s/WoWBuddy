@@ -20,6 +20,7 @@ public sealed class CapabilityProbeTests
         Assert.True(report.Supports(GameCapability.TradeSkills));
         Assert.True(report.Supports(GameCapability.Vendor));
         Assert.True(report.Supports(GameCapability.Talents));
+        Assert.True(report.Supports(GameCapability.Travel));
 
         // The two this project believes 12340 does not have.
         Assert.False(report.Supports(GameCapability.QuestCompletion));

@@ -54,6 +54,7 @@ public sealed class LiveBotStateTests
             new LuaInventory(lua, capabilities, () => Now),
             new LuaVendor(lua, capabilities, () => Now),
             new LuaTalents(lua, capabilities),
+            new LuaTravel(lua, capabilities, () => false, "Riding Horse"),
             new SessionScheduler(new SessionSchedule()),
             new FuryWarrior(),
             new StubCombat(),

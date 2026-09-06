@@ -261,7 +261,17 @@ public sealed class BotController(BotSettings? settings = null) : IBotController
 
         _runner = new BotRunner(
             state,
-            RootTree.Build(_tree!, planner, errandHandler, talents).Root);
+            RootTree.Build(
+                _tree!,
+                planner,
+                errandHandler,
+                talents,
+                new TravelSettings
+                {
+                    Enabled = _settings.MountName.Length > 0,
+                    WorthMountingFor = _settings.MountForJourneysOver,
+                })
+            .Root);
         _runner.Start();
 
         // A tick every quarter second. Faster buys nothing — the client's own update rate is
@@ -304,6 +314,7 @@ public sealed class BotController(BotSettings? settings = null) : IBotController
             new LuaInventory(lua, _capabilities!),
             new LuaVendor(lua, _capabilities!),
             new LuaTalents(lua, _capabilities!),
+            new LuaTravel(lua, _capabilities!, () => view.IsMounted, _settings.MountName),
             new SessionScheduler(new SessionSchedule()),
             routine,
             new LiveCombatContext(lua, view, _caster));

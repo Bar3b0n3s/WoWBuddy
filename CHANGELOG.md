@@ -31,6 +31,8 @@ zero, anything may change.
 
 ### Added
 
+- **Mounts.** The character gets on for a long journey and off for combat, looting, skinning
+  or arrival. Name the mount; blank walks everywhere.
 - **Talent points are spent from a build you write.** `1:3, 1:3, 2:5` — one point per tick, out
   of combat, in the order given, stopping the moment the client refuses one. No build means no
   spending, which costs nothing.

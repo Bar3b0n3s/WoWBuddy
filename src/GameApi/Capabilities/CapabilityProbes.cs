@@ -123,6 +123,11 @@ public static class CapabilityProbes
             ["GetUnspentTalentPoints", "GetTalentInfo", "LearnTalent"],
             "spending talent points",
             "Points are left unspent, which costs nothing."),
+
+        new(GameCapability.Travel,
+            ["IsUsableSpell", "CastSpellByName", "Dismount"],
+            "getting on and off a mount",
+            "The character walks everywhere, which is slower and never wrong."),
     ];
 
     /// <summary>Asks the client about every capability.</summary>

@@ -110,7 +110,8 @@ public sealed class FakeLua : ILuaEvaluator
             "GetTradeSkillLine", "DoTradeSkill", "CloseTradeSkill",
             "CanMerchantRepair", "RepairAllItems", "GetRepairAllCost", "GetContainerItemInfo",
             "SendMail", "ClearSendMail", "CloseMerchant", "CloseMail",
-            "GetUnspentTalentPoints", "GetTalentInfo", "LearnTalent");
+            "GetUnspentTalentPoints", "GetTalentInfo", "LearnTalent",
+            "IsUsableSpell", "CastSpellByName", "Dismount");
 
         return lua;
     }

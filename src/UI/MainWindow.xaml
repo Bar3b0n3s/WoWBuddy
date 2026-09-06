@@ -42,6 +42,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -105,6 +106,12 @@
                            TextTrimming="CharacterEllipsis"
                            Text="{Binding TalentBuildError}"
                            ToolTip="{Binding TalentBuildError}" />
+
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="Mount:" VerticalAlignment="Center"
+                           Margin="0,8,6,0" />
+                <TextBox Grid.Row="3" Grid.Column="1" VerticalAlignment="Center" Margin="0,8,0,0"
+                         Text="{Binding MountName, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="The mount to cast, as the client names it. Blank walks everywhere." />
             </Grid>
         </GroupBox>
 

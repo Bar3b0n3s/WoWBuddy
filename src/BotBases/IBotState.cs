@@ -118,6 +118,14 @@ public interface IBotState
     bool SetTarget(WoWGuid guid);
 
     /// <summary>Starts walking to a position. False when no route could be found.</summary>
+    /// <summary>How far the current journey still has to go, or zero when standing still.</summary>
+    /// <remarks>
+    /// The length of the remaining path rather than the distance to the destination: a
+    /// destination twenty yards away round a cliff is a long journey, and the difference is
+    /// exactly what decides whether mounting is worth it.
+    /// </remarks>
+    float RemainingDistance { get; }
+
     bool MoveTo(Vector3 destination);
 
     /// <summary>Stops moving.</summary>
@@ -218,6 +226,9 @@ public interface IBotState
 
     /// <summary>Spending talent points.</summary>
     ITalents Talents { get; }
+
+    /// <summary>Getting somewhere faster than walking.</summary>
+    ITravel Travel { get; }
 
     /// <summary>
     /// Corpses the character has looted that still hold a skin.

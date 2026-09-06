@@ -45,6 +45,10 @@ public static class RootTree
     /// Carries an errand out: walks to the vendor, sells, repairs, posts the mail. Omit and
     /// errands are never started, because beginning one nothing can finish would stop the bot.
     /// </param>
+    /// <param name="travel">
+    /// When to get on a mount. Omit and the character walks everywhere, which is slower and
+    /// never wrong.
+    /// </param>
     /// <param name="talents">
     /// The order to spend talent points in. Omit and points are left unspent, which is the
     /// right answer: spending them in the wrong order costs gold to undo.
@@ -53,7 +57,8 @@ public static class RootTree
         Node<IBotState> botBase,
         ErrandPlanner? errands = null,
         Node<IBotState>? errandHandler = null,
-        TalentBuild? talents = null)
+        TalentBuild? talents = null,
+        TravelSettings? travel = null)
     {
         ArgumentNullException.ThrowIfNull(botBase);
 
@@ -92,6 +97,7 @@ public static class RootTree
                 HandleLooting(),
                 HandleSkinning(),
                 HandleTalents(talents),
+                HandleMounting(travel),
 
                 HandleRest(),
                 HandleErrands(errands, errandHandler),
@@ -309,6 +315,51 @@ public static class RootTree
         { Name = "Handle combat" };
 
 
+
+
+    /// <summary>
+    /// Getting on a mount before a long walk, and off again before doing anything else.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Above the bot base so the mount goes on before the journey starts, and below combat and
+    /// looting so it never delays either. A mount cast is interrupted by damage and cancelled
+    /// by moving, so trying at the wrong moment means starting casts that never finish and
+    /// arriving later than if the character had walked.
+    /// </para>
+    /// <para>
+    /// Dismounting is the other half and matters more than it looks: a mounted character cannot
+    /// loot, gather, skin or attack, so a bot that forgets to get off simply stops working.
+    /// </para>
+    /// </remarks>
+    public static Node<IBotState> HandleMounting(TravelSettings? travel)
+    {
+        if (travel is not { Enabled: true })
+        {
+            return new Check<IBotState>(_ => false) { Name = "Mounting off" };
+        }
+
+        return new PrioritySelector<IBotState>(
+            // Off first. Everything the bot does apart from travelling needs the character on
+            // its own feet, and being mounted at the wrong moment is a silent stop.
+            new If<IBotState>(
+                s => s.Travel.IsMounted
+                     && (s.IsInCombat
+                         || s.LootableCorpses.Count > 0
+                         || s.SkinnableCorpses.Count > 0
+                         || s.RemainingDistance < travel.WorthMountingFor),
+                new Do<IBotState>(s => s.Travel.Dismount() ? RunStatus.Success : RunStatus.Failure)
+                { Name = "Get off" }),
+
+            new If<IBotState>(
+                s => !s.Travel.IsMounted
+                     && !s.IsInCombat
+                     && s.Travel.CanMount
+                     && s.RemainingDistance >= travel.WorthMountingFor,
+                new Do<IBotState>(s => s.Travel.Mount() ? RunStatus.Running : RunStatus.Failure)
+                { Name = "Get on" }))
+        { Name = "Handle mounting" };
+    }
 
     /// <summary>
     /// Spending a talent point when one is going spare.

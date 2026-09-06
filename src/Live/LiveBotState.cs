@@ -51,6 +51,7 @@ public sealed class LiveBotState : IBotState, IProfileConditionContext
     private readonly LuaInventory _inventory;
     private readonly LuaVendor _vendor;
     private readonly LuaTalents _talents;
+    private readonly LuaTravel _travel;
     private readonly SessionScheduler _session;
 
     private readonly Func<DateTimeOffset> _clock;
@@ -68,6 +69,7 @@ public sealed class LiveBotState : IBotState, IProfileConditionContext
         LuaInventory inventory,
         LuaVendor vendor,
         LuaTalents talents,
+        LuaTravel travel,
         SessionScheduler session,
         ICombatRoutine routine,
         ICombatContext combat,
@@ -85,6 +87,7 @@ public sealed class LiveBotState : IBotState, IProfileConditionContext
         _inventory = inventory ?? throw new ArgumentNullException(nameof(inventory));
         _vendor = vendor ?? throw new ArgumentNullException(nameof(vendor));
         _talents = talents ?? throw new ArgumentNullException(nameof(talents));
+        _travel = travel ?? throw new ArgumentNullException(nameof(travel));
         _session = session ?? throw new ArgumentNullException(nameof(session));
 
         Routine = routine ?? throw new ArgumentNullException(nameof(routine));
@@ -225,6 +228,34 @@ public sealed class LiveBotState : IBotState, IProfileConditionContext
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// The length of what is left of the path, not the distance to its end: a destination
+    /// twenty yards away round a cliff is a long journey, and mounting should know the
+    /// difference.
+    /// </remarks>
+    public float RemainingDistance
+    {
+        get
+        {
+            IReadOnlyList<Vector3> path = _movement.Path;
+
+            if (_movement.State != MovementState.Moving || path.Count == 0)
+            {
+                return 0f;
+            }
+
+            float total = Position.Distance(path[0]);
+
+            for (int index = 1; index < path.Count; index++)
+            {
+                total += path[index - 1].Distance(path[index]);
+            }
+
+            return total;
+        }
+    }
+
+    /// <inheritdoc />
     public void StopMoving() => _movement.Stop();
 
     // ---- housekeeping -----------------------------------------------------------------------
@@ -288,6 +319,9 @@ public sealed class LiveBotState : IBotState, IProfileConditionContext
 
     /// <inheritdoc />
     public ITalents Talents => _talents;
+
+    /// <inheritdoc />
+    public ITravel Travel => _travel;
 
     // ---- what a profile condition asks about ----------------------------------------------------
 

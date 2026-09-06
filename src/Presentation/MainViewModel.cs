@@ -489,6 +489,13 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    /// <summary>The mount to cast, or empty to walk everywhere.</summary>
+    public string MountName
+    {
+        get => _settings.MountName;
+        set => Remember(_settings with { MountName = value }, nameof(MountName));
+    }
+
     /// <summary>What is wrong with the talent build, or empty when nothing is.</summary>
     public string TalentBuildError { get; private set; } = string.Empty;
 

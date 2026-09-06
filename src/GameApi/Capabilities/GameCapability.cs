@@ -50,6 +50,9 @@ public enum GameCapability
 
     /// <summary>Spending talent points.</summary>
     Talents,
+
+    /// <summary>Getting on and off a mount.</summary>
+    Travel,
 }
 
 /// <summary>One thing to ask the client about itself.</summary>
