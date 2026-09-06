@@ -45,8 +45,14 @@ public enum GameCapability
     /// <summary>Reading what the character can make, and making it.</summary>
     TradeSkills,
 
+    /// <summary>What a recipe is made from, and how much of it the character has.</summary>
+    Reagents,
+
     /// <summary>Doing business with a vendor or a mailbox.</summary>
     Vendor,
+
+    /// <summary>Reading a merchant's shelves and buying from them.</summary>
+    Buying,
 
     /// <summary>Spending talent points.</summary>
     Talents,

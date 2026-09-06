@@ -32,11 +32,19 @@ public readonly record struct StepChoice(ProfileStep? Step, string Reason)
 public sealed class ProfileRunner
 {
     private readonly Profile _profile;
+    private readonly QuestObjectives _objectives;
     private readonly HashSet<int> _stalledRepeats = [];
 
-    public ProfileRunner(Profile profile)
+    /// <summary>Builds a runner over a profile.</summary>
+    /// <param name="profile">The plan to work through.</param>
+    /// <param name="objectives">
+    /// What each quest actually asks for, from the user's world data. Omit and a step is judged
+    /// finished by the quest log alone, which is what happened before there was any export.
+    /// </param>
+    public ProfileRunner(Profile profile, QuestObjectives? objectives = null)
     {
         _profile = profile ?? throw new ArgumentNullException(nameof(profile));
+        _objectives = objectives ?? QuestObjectives.None;
     }
 
     /// <summary>The profile being run.</summary>
@@ -97,7 +105,7 @@ public sealed class ProfileRunner
                 continue;
             }
 
-            if (IsDone(step, state))
+            if (IsDone(step, state, _objectives))
             {
                 continue;
             }
@@ -114,7 +122,7 @@ public sealed class ProfileRunner
     /// is what lets a profile be picked up mid-way on a character that has already done some
     /// of it.
     /// </remarks>
-    public static bool IsDone(ProfileStep step, IBotState state)
+    public static bool IsDone(ProfileStep step, IBotState state, QuestObjectives? objectives = null)
     {
         ArgumentNullException.ThrowIfNull(state);
 
@@ -129,7 +137,7 @@ public sealed class ProfileRunner
                 return quests.IsCompleted(step.QuestId);
 
             case StepKind.Objective:
-                return IsObjectiveDone(step, quests, state);
+                return IsObjectiveDone(step, quests, state, objectives ?? QuestObjectives.None);
 
             case StepKind.RunTo:
                 return state.Position.Distance(step.Position) <= ArrivalRange;
@@ -148,7 +156,11 @@ public sealed class ProfileRunner
     /// <summary>How close counts as having arrived somewhere.</summary>
     public const float ArrivalRange = 5f;
 
-    private static bool IsObjectiveDone(ProfileStep step, IQuestLog quests, IBotState state)
+    private static bool IsObjectiveDone(
+        ProfileStep step,
+        IQuestLog quests,
+        IBotState state,
+        QuestObjectives objectives)
     {
         if (quests.IsCompleted(step.QuestId))
         {
@@ -176,9 +188,13 @@ public sealed class ProfileRunner
         // A collect objective can also be satisfied by already carrying the items: the quest
         // log only counts them once they are in the bags, and both answers agree, but this one
         // is right a tick sooner and does not depend on the log's wording.
-        if (step is { Objective: ObjectiveKind.Collect, ItemId: > 0, Count: > 0 })
+        //
+        // The item and the count come from the profile when it gives them, and from the user's
+        // world data when it does not — which is the common case for an imported profile.
+        if (step.Objective == ObjectiveKind.Collect
+            && objectives.CollectionFor(step) is { Entry: > 0, Count: > 0 } collection)
         {
-            return state.ItemCount(step.ItemId) >= step.Count;
+            return state.ItemCount(collection.Entry) >= collection.Count;
         }
 
         return false;

@@ -242,4 +242,130 @@ public sealed class LuaTradeSkillsTests
         Assert.Contains("GetTradeSkillInfo(i)", LuaTradeSkills.ReadScript, StringComparison.Ordinal);
         Assert.Contains("kind ~= \"header\"", LuaTradeSkills.ReadScript, StringComparison.Ordinal);
     }
+
+    // ---- reagents -------------------------------------------------------------------------
+
+    private static string Reagent(uint itemId, string name, int needed, int have) =>
+        string.Join(Field, itemId, name, needed, have);
+
+    /// <summary>
+    /// How many times the reagent script was actually run.
+    /// </summary>
+    /// <remarks>
+    /// Executions only. The capability probe asks <c>type(GetTradeSkillNumReagents)</c> once at
+    /// attach, and counting that as a read would make this measure the wrong thing.
+    /// </remarks>
+    private static int ReagentReads(FakeLua lua) =>
+        lua.Asked.Count(asked =>
+            asked.StartsWith("execute: ", StringComparison.Ordinal)
+            && asked.Contains("GetTradeSkillNumReagents", StringComparison.Ordinal));
+
+    /// <summary>Answers the recipe list and the reagent list separately, as a client would.</summary>
+    private static FakeLua WithReagents(string recipes, string reagents)
+    {
+        FakeLua lua = FakeLua.Typical335a();
+        lua.Answers["__wowbuddy_result"] = recipes;
+
+        lua.OnExecute = script =>
+            lua.Answers["__wowbuddy_result"] =
+                script.Contains("GetTradeSkillNumReagents", StringComparison.Ordinal)
+                    ? reagents
+                    : recipes;
+
+        return lua;
+    }
+
+    [Fact]
+    public void ReadsWhatARecipeIsMadeFromAndHowMuchIsCarried()
+    {
+        FakeLua lua = WithReagents(
+            string.Join(Row,
+                Header("Blacksmithing", 50, 150),
+                Recipe(3, "Rough Grinding Stone", "optimal", 0)),
+            string.Join(Row,
+                Reagent(2835, "Rough Stone", 2, 5),
+                Reagent(2880, "Weak Flux", 1, 0)));
+
+        LuaTradeSkills skills = Build(lua);
+        TradeSkillRecipe recipe = skills.Recipes[0];
+
+        IReadOnlyList<TradeSkillReagent> reagents = skills.ReagentsFor(recipe);
+
+        Assert.Equal(2, reagents.Count);
+        Assert.Equal(2835u, reagents[0].ItemId);
+        Assert.False(reagents[0].IsShort);
+
+        // One needed and none carried: this is what sends the character shopping.
+        Assert.True(reagents[1].IsShort);
+        Assert.Equal(10, reagents[1].ShortFor(10));
+    }
+
+    [Fact]
+    public void TheRecipesOwnIndexIsWhatIsAskedAbout()
+    {
+        // Asking about the wrong index describes a different recipe, and the bot would go and
+        // buy the wrong materials.
+        FakeLua lua = WithReagents(
+            string.Join(Row,
+                Header("Blacksmithing", 50, 150),
+                Recipe(7, "Rough Grinding Stone", "optimal", 0)),
+            Reagent(2835, "Rough Stone", 2, 0));
+
+        LuaTradeSkills skills = Build(lua);
+        skills.ReagentsFor(skills.Recipes[0]);
+
+        Assert.Contains(
+            lua.Asked,
+            asked => asked.Contains("local index = 7", StringComparison.Ordinal));
+
+        Assert.Equal(1, ReagentReads(lua));
+    }
+
+    [Fact]
+    public void AReagentTheClientCannotLinkIsReportedWithNoIdRatherThanAGuess()
+    {
+        // An id of zero is skipped by the caller: that costs a trip for one material, and never
+        // buys the wrong thing.
+        FakeLua lua = WithReagents(
+            string.Join(Row, Header("Cooking", 60, 150), Recipe(1, "Spiced Wolf Meat", "optimal", 0)),
+            Reagent(0, "Lean Wolf Flank", 1, 0));
+
+        LuaTradeSkills skills = Build(lua);
+
+        Assert.Equal(0u, skills.ReagentsFor(skills.Recipes[0])[0].ItemId);
+    }
+
+    [Fact]
+    public void WithoutTheReagentCallsNothingIsClaimed()
+    {
+        // Empty means unknown, not "made from nothing" — the caller treats it as a reason not
+        // to go shopping rather than as a shopping list of nothing.
+        FakeLua lua = WithReagents(
+            string.Join(Row, Header("Cooking", 60, 150), Recipe(1, "Spiced Wolf Meat", "optimal", 0)),
+            Reagent(2835, "Rough Stone", 2, 0));
+
+        lua.Functions.Remove("GetTradeSkillReagentItemLink");
+
+        LuaTradeSkills skills = Build(lua);
+
+        Assert.Empty(skills.ReagentsFor(skills.Recipes[0]));
+    }
+
+    [Fact]
+    public void MakingSomethingForgetsTheReagentCountsToo()
+    {
+        // Materials are gone, so every count read a moment ago is now wrong.
+        FakeLua lua = WithReagents(
+            string.Join(Row, Header("Cooking", 60, 150), Recipe(1, "Spiced Wolf Meat", "optimal", 4)),
+            Reagent(2835, "Lean Wolf Flank", 1, 4));
+
+        LuaTradeSkills skills = Build(lua);
+        TradeSkillRecipe recipe = skills.Recipes[0];
+
+        skills.ReagentsFor(recipe);
+        skills.Craft(recipe, 1);
+        skills.ReagentsFor(recipe);
+
+        Assert.Equal(2, ReagentReads(lua));
+    }
 }

@@ -5,6 +5,7 @@ using WoWBuddy.BotBases.Support;
 using WoWBuddy.Common.Geometry;
 using WoWBuddy.Presentation;
 using WoWBuddy.Profiles;
+using WoWBuddy.WorldData;
 using Xunit;
 
 namespace WoWBuddy.Presentation.Tests;
@@ -203,6 +204,90 @@ public sealed class BotBaseFactoryTests
         Assert.Contains("Cooking", built.Message, StringComparison.Ordinal);
     }
 
+
+    // ---- world data ------------------------------------------------------------------------
+
+    /// <summary>An export with one vendor selling flux and one quest wanting kobolds dead.</summary>
+    private static WorldDataSet Exported()
+    {
+        string directory = Path.Combine(
+            Path.GetTempPath(), "wowbuddy-factory", Guid.NewGuid().ToString("N"));
+
+        Directory.CreateDirectory(directory);
+
+        void Write(string file, params string[] lines) =>
+            File.WriteAllText(Path.Combine(directory, file), string.Join('\n', lines));
+
+        Write(WorldDataSet.FileNames.CreatureSpawns,
+            "guid\tentry\tmap\tx\ty\tz",
+            "10\t555\t0\t-8890\t500\t90");
+
+        Write(WorldDataSet.FileNames.CreatureTemplates,
+            "entry\tname\tnpcflag",
+            "555\tGeneral Goods\t128");
+
+        Write(WorldDataSet.FileNames.VendorItems, "entry\titem", "555\t2880");
+
+        Write(WorldDataSet.FileNames.QuestTemplates,
+            "id\ttitle\tminlevel\tquestlevel\tnpc1\tnpccount1\tnpc2\tnpccount2\tnpc3\tnpccount3\tnpc4\tnpccount4\titem1\titemcount1\titem2\titemcount2\titem3\titemcount3\titem4\titemcount4\titem5\titemcount5\titem6\titemcount6",
+            "9001\tKobold Camp Cleanup\t5\t6\t1412\t8\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0");
+
+        WorldDataSet set = new();
+        set.LoadFrom(directory);
+        return set;
+    }
+
+    [Fact]
+    public void WithoutWorldDataTheCraftingBaseSaysItCannotBuyMore()
+    {
+        // A bot that appears to run and quietly achieves nothing is worse than one that says
+        // what it cannot do.
+        BotBaseBuild built = BotBaseFactory.Create(
+            "Craft",
+            tradeSkills: new StubTradeSkills(),
+            crafting: new CraftSettings { Profession = "Blacksmithing" });
+
+        Assert.True(built.Success);
+        Assert.Contains("cannot buy more", built.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WithWorldDataTheCraftingBaseCanRestock()
+    {
+        BotBaseBuild built = BotBaseFactory.Create(
+            "Craft",
+            tradeSkills: new StubTradeSkills(),
+            crafting: new CraftSettings { Profession = "Blacksmithing" },
+            world: Exported());
+
+        Assert.True(built.Success);
+        Assert.Contains("buying materials", built.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WithoutQuestDataTheQuestingBaseSaysItWorksFromTheProfile()
+    {
+        Profile profile = WithSteps(
+            new ProfileStep(StepKind.Objective, QuestId: 9001, Position: Somewhere));
+
+        BotBaseBuild built = BotBaseFactory.Create("Questing", profile);
+
+        Assert.True(built.Success);
+        Assert.Contains("No quest data", built.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WithQuestDataTheQuestingBaseSaysNothingExtra()
+    {
+        Profile profile = WithSteps(
+            new ProfileStep(StepKind.Objective, QuestId: 9001, Position: Somewhere));
+
+        BotBaseBuild built = BotBaseFactory.Create("Questing", profile, world: Exported());
+
+        Assert.True(built.Success);
+        Assert.DoesNotContain("No quest data", built.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void EveryBotBaseTheWindowOffersCanBeBuilt()
     {
@@ -236,6 +321,8 @@ internal sealed class StubTradeSkills : ITradeSkills
     public bool Open(string profession) => true;
 
     public TradeSkillRecipe? BestForSkillUp() => null;
+
+    public IReadOnlyList<TradeSkillReagent> ReagentsFor(TradeSkillRecipe recipe) => [];
 
     public int Craft(TradeSkillRecipe recipe, int count = 1) => 0;
 

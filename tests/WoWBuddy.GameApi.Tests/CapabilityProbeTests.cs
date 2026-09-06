@@ -18,7 +18,9 @@ public sealed class CapabilityProbeTests
         Assert.True(report.Supports(GameCapability.Party));
         Assert.True(report.Supports(GameCapability.Battlegrounds));
         Assert.True(report.Supports(GameCapability.TradeSkills));
+        Assert.True(report.Supports(GameCapability.Reagents));
         Assert.True(report.Supports(GameCapability.Vendor));
+        Assert.True(report.Supports(GameCapability.Buying));
         Assert.True(report.Supports(GameCapability.Talents));
         Assert.True(report.Supports(GameCapability.Travel));
 

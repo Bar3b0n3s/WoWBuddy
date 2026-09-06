@@ -110,6 +110,15 @@ public static class CapabilityProbes
             "reading what the character can make, and making it",
             "The crafting base cannot run."),
 
+        // What a recipe takes is in the window the client already opened, so this needs no data
+        // either — but it is a separate probe because the crafting base works without it and
+        // only the shopping does not.
+        new(GameCapability.Reagents,
+            ["GetTradeSkillNumReagents", "GetTradeSkillReagentInfo",
+             "GetTradeSkillReagentItemLink"],
+            "reading what a recipe is made from",
+            "The crafting base stops when the materials run out instead of buying more."),
+
         // Frames are tables, not functions, so the windows themselves cannot be probed this
         // way — only the calls. That is the honest limit of an existence check.
         new(GameCapability.Vendor,
@@ -118,6 +127,12 @@ public static class CapabilityProbes
              "CloseMerchant", "CloseMail"],
             "selling, repairing and posting mail",
             "Errands cannot be carried out; the bot will keep playing and let the bags fill."),
+
+        new(GameCapability.Buying,
+            ["GetMerchantNumItems", "GetMerchantItemInfo", "GetMerchantItemLink",
+             "BuyMerchantItem"],
+            "reading a merchant's shelves and buying from them",
+            "The bot never buys anything, so the crafting base stops when the bags run dry."),
 
         new(GameCapability.Talents,
             ["GetUnspentTalentPoints", "GetTalentInfo", "LearnTalent"],

@@ -81,9 +81,13 @@ few things the bot does without asking you to extract anything.
 for, and never picks grey: making a trivial recipe consumes materials and raises nothing, which
 is worse than stopping.
 
-Two things it does not do. It does not open the window — casting a profession is a spell like
-any other and belongs with the casting that already exists. And it does not buy materials, so it
-makes what the character is carrying and then stops.
+It also reads what each recipe is made from, and how much of it the character is carrying, which
+is what tells the crafting base it is short of something and by how much. The item ids come out
+of the reagents' own hyperlinks, because the client gives a name and a count and no id — and a
+name cannot be matched against a vendor table without knowing which language the client is in.
+
+One thing it does not do: it does not open the window. Casting a profession is a spell like any
+other and belongs with the casting that already exists.
 
 ## The crafting base
 
@@ -97,13 +101,33 @@ would not open, the skill is at its training cap, the materials ran out, or the 
 one the character does not know. Once stopped it stays stopped until reset — a session that
 restarted itself would burn a night's materials.
 
-**It does not buy materials.** Working out what a recipe needs takes item data this project does
-not ship, so it makes what the character is carrying and then stops with a reason.
+### Buying materials
+
+With a world data export loaded, running out of materials sends the character shopping instead
+of stopping. The client says what the recipe takes and how much is in the bags; your export says
+who sells the difference; `SupplyRun` walks there, buys it, and comes back to where the crafting
+was happening — which matters more than it sounds, because a blacksmith crafts at an anvil and
+one that buys its flux and stays in the shop has not finished the errand.
+
+It stocks up for several batches rather than one. The walk is the expensive part: going to a
+shop for two flux and walking back is most of a minute for twenty seconds of crafting. It buys
+everything on its list that a shop stocks while it is standing there, keeps money back for the
+repair bill, and buys what the money allows rather than nothing when it cannot afford the lot.
+
+**Most materials cannot be bought at all.** Ore, herbs, leather and cloth come off the world,
+not off a shelf, so stopping with `OutOfMaterials` is still the ordinary outcome — and with no
+export it is the only outcome, exactly as before. What this buys is the other kind: flux,
+thread, dye, salt, vials. Stopping for want of a stack of thread was never a good reason to end
+a session.
+
+Two shopping trips at most. A trip that comes back and leaves the recipe still unmakeable means
+the bot has misunderstood something, and a third trip would misunderstand it again.
 
 ## What is not here
 
-Buying materials to feed the crafting base, and taking a character to a trainer when a
-profession or a skill hits its cap. Both need data this project does not ship.
+Taking a character to a trainer when a profession or a skill hits its cap: the bot can find a
+class trainer from world data, but the profession trainer's own window is not read, so it cannot
+tell learning a new rank from buying a recipe.
 
 ## Skinning
 

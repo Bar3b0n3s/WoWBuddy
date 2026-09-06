@@ -112,6 +112,15 @@ Common attributes: `Entry` (what to kill or talk to), `ItemId` (what to collect 
 `Index` (which of the quest's objectives, 1-based; 0 means all of them), `Count`, `Radius`, and
 either `X`/`Y`/`Z` or a list of `<Hotspot X="" Y="" Z="" />` children.
 
+**`Entry` and `ItemId` can be left out if you have a world data export.** The bot then reads the
+creature ids and item counts out of your own `quest-templates.tsv` — which is what an imported
+profile usually needs, since Honorbuddy profiles describe an area and leave the objective to the
+quest log. Without an export a `Kill` objective with no `Entry` kills whatever is nearest and
+finishes by luck; with one it kills what the quest asked for.
+
+What the profile says always wins. It was written by someone looking at the quest, and a quest
+that wants "any beast in the valley" is written as an entry no database can derive.
+
 ## Conditions
 
 A condition is a term the bot knows, an optional id, a comparison and a number:
@@ -218,10 +227,15 @@ A step counts as done when the game says so, never when the bot remembers doing 
 | ----------- | --------------------------------------------------------------------- |
 | `PickUp`    | the quest is in the log, or recorded as handed in                     |
 | `TurnIn`    | the quest is recorded as handed in                                    |
-| `Objective` | the quest is complete, that objective is done, or the items are carried |
+| `Objective` | the quest is complete, that objective is done, or the items are carried\* |
 | `RunTo`     | the character is within five yards                                    |
 | `Grind`     | never — its conditions are what stop it                               |
 | `Repeat`    | its condition stops holding                                           |
+
+\* "The items are carried" needs to know which item and how many. The profile can say; failing
+that, a world data export can, as long as the quest asks for exactly one thing — sending the
+character after the wrong one of three collections means the step never finishes, which is worse
+than not knowing.
 
 Running out of steps is not an error. A profile written for levels 1 to 10 stops having
 anything to do at 10, and a character standing still is worse than one levelling slowly, so the

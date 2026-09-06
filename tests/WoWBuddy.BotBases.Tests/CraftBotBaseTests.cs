@@ -1,6 +1,9 @@
 using WoWBuddy.Behavior;
 using WoWBuddy.BotBases;
 using WoWBuddy.BotBases.Support;
+using WoWBuddy.Common.Geometry;
+using WoWBuddy.Core.Objects;
+using WoWBuddy.Profiles;
 using Xunit;
 
 namespace WoWBuddy.BotBases.Tests;
@@ -47,6 +50,12 @@ public sealed class FakeTradeSkills : ITradeSkills
         return best;
     }
 
+    /// <summary>What each recipe is made from, by recipe name.</summary>
+    public Dictionary<string, List<TradeSkillReagent>> Reagents { get; } = [];
+
+    public IReadOnlyList<TradeSkillReagent> ReagentsFor(TradeSkillRecipe recipe) =>
+        Reagents.TryGetValue(recipe.Name, out List<TradeSkillReagent>? reagents) ? reagents : [];
+
     public int Craft(TradeSkillRecipe recipe, int count = 1)
     {
         int made = Math.Min(count, recipe.Available);
@@ -64,6 +73,19 @@ public sealed class FakeTradeSkills : ITradeSkills
     public FakeTradeSkills With(string name, RecipeDifficulty difficulty, int available)
     {
         Known.Add(new TradeSkillRecipe(Known.Count + 1, name, difficulty, available));
+        return this;
+    }
+
+    /// <summary>Says what a recipe is made from.</summary>
+    public FakeTradeSkills MadeFrom(string recipe, uint itemId, string name, int needed, int have)
+    {
+        if (!Reagents.TryGetValue(recipe, out List<TradeSkillReagent>? reagents))
+        {
+            reagents = [];
+            Reagents[recipe] = reagents;
+        }
+
+        reagents.Add(new TradeSkillReagent(itemId, name, needed, have));
         return this;
     }
 }
@@ -253,5 +275,170 @@ public sealed class CraftBotBaseTests
 
         bot.Reset();
         Assert.Equal(CraftStop.None, bot.Stopped);
+    }
+
+    // ---- shopping -------------------------------------------------------------------------
+
+    private const uint FluxId = 2880;
+
+    private static readonly Vector3 Anvil = new(100f, 100f, 10f);
+    private static readonly Vector3 Shop = new(120f, 100f, 10f);
+
+    /// <summary>A blacksmith with a recipe it has no materials for.</summary>
+    private static FakeTradeSkills OutOfFlux()
+    {
+        FakeTradeSkills skills = new();
+        skills.Line = new TradeSkillLine("Blacksmithing", 50, 150);
+        skills.With("Rough Grinding Stone", RecipeDifficulty.Optimal, available: 0);
+        skills.MadeFrom("Rough Grinding Stone", FluxId, "Weak Flux", needed: 2, have: 0);
+        return skills;
+    }
+
+    private static FakeBotState AtTheAnvil()
+    {
+        FakeBotState state = new() { Position = Anvil };
+
+        state.VisibleObjects =
+        [
+            new VisibleObject(new WoWGuid(0x40), 1234, Shop, HasPosition: true, Distance: 1f),
+        ];
+
+        state.VendorState.Selling(FluxId, "Weak Flux", price: 10);
+        return state;
+    }
+
+    private static SupplyRun ShopAt(Vector3 where) =>
+        new(new SupplySettings
+        {
+            Batches = 1,
+            FindVendor = (_, _, _) => new ProfileVendor("Smith Argus", 1234, 0, where),
+        });
+
+    [Fact]
+    public void WithNowhereToShopItStopsExactlyAsItAlwaysDid()
+    {
+        // The behaviour before any of the buying existed, and still the right one when the user
+        // has no world data: stop, with a reason, rather than pretend.
+        CraftBotBase craft = new(Settings());
+        Node<IBotState> tree = craft.Build(OutOfFlux());
+
+        Assert.Equal(RunStatus.Failure, tree.Tick(AtTheAnvil()));
+        Assert.Equal(CraftStop.OutOfMaterials, craft.Stopped);
+    }
+
+    [Fact]
+    public void RunningOutOfMaterialsSendsItShoppingInsteadOfStopping()
+    {
+        CraftBotBase craft = new(Settings(), ShopAt(Shop));
+        Node<IBotState> tree = craft.Build(OutOfFlux());
+        FakeBotState state = AtTheAnvil();
+
+        Assert.Equal(RunStatus.Running, tree.Tick(state));
+        Assert.Equal(CraftStop.None, craft.Stopped);
+        Assert.Equal(1, craft.SupplyRuns);
+
+        // On its way on the next tick, rather than standing at the anvil casting the profession
+        // at nothing.
+        Assert.Equal(RunStatus.Running, tree.Tick(state));
+        Assert.Contains("MoveTo", state.Actions);
+    }
+
+    [Fact]
+    public void WhileShoppingItDoesNotTryToReopenTheProfession()
+    {
+        // The window closes as soon as the character walks away, and casting the profession
+        // again would cancel the journey every tick.
+        FakeTradeSkills skills = OutOfFlux();
+        CraftBotBase craft = new(Settings(), ShopAt(Shop));
+        Node<IBotState> tree = craft.Build(skills);
+        FakeBotState state = AtTheAnvil();
+
+        tree.Tick(state);
+
+        skills.Line = default;
+        skills.Actions.Clear();
+
+        tree.Tick(state);
+
+        Assert.DoesNotContain(
+            skills.Actions,
+            action => action.StartsWith("Open(", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ItComesBackAndCarriesOn()
+    {
+        FakeTradeSkills skills = OutOfFlux();
+        CraftBotBase craft = new(Settings(), ShopAt(Shop));
+        Node<IBotState> tree = craft.Build(skills);
+        FakeBotState state = AtTheAnvil();
+
+        for (int tick = 0; tick < 20 && craft.Stopped == CraftStop.None; tick++)
+        {
+            tree.Tick(state);
+
+            if (state.MoveRequests.Count > 0)
+            {
+                state.Position = state.MoveRequests[^1];
+                state.MoveRequests.Clear();
+            }
+
+            if (state.Actions.Exists(a => a.StartsWith("Interact(", StringComparison.Ordinal)))
+            {
+                state.VendorState.IsMerchantOpen = true;
+            }
+
+            // What the client would do once the flux is in the bags.
+            if (state.VendorState.Actions.Exists(a => a.StartsWith("Buy(", StringComparison.Ordinal)))
+            {
+                skills.Known[0] = skills.Known[0] with { Available = 2 };
+            }
+        }
+
+        Assert.Equal(CraftStop.None, craft.Stopped);
+        Assert.Equal(Anvil, state.Position);
+        Assert.Contains(skills.Actions, action => action.StartsWith("Craft(", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ATripThatDoesNotFixItStopsRatherThanWalkingBackAndForthAllEvening()
+    {
+        // A trip that comes back and leaves the recipe still unmakeable means the bot has
+        // misunderstood something, and a third trip would misunderstand it again.
+        FakeTradeSkills skills = OutOfFlux();
+        CraftBotBase craft = new(Settings(), ShopAt(Shop));
+        Node<IBotState> tree = craft.Build(skills);
+        FakeBotState state = AtTheAnvil();
+
+        for (int tick = 0; tick < 60 && craft.Stopped == CraftStop.None; tick++)
+        {
+            tree.Tick(state);
+
+            if (state.MoveRequests.Count > 0)
+            {
+                state.Position = state.MoveRequests[^1];
+                state.MoveRequests.Clear();
+            }
+
+            if (state.Actions.Exists(a => a.StartsWith("Interact(", StringComparison.Ordinal)))
+            {
+                state.VendorState.IsMerchantOpen = true;
+            }
+        }
+
+        Assert.Equal(CraftStop.OutOfMaterials, craft.Stopped);
+        Assert.Equal(CraftBotBase.MaxSupplyRuns, craft.SupplyRuns);
+    }
+
+    [Fact]
+    public void ANamedRecipeItCannotMakeIsStillReportedAsUnknownRatherThanShoppedFor()
+    {
+        // Shopping cannot fix not knowing the recipe, and setting off for a shop would hide the
+        // one thing the user needs to be told.
+        CraftBotBase craft = new(Settings("Truesilver Bar"), ShopAt(Shop));
+        Node<IBotState> tree = craft.Build(OutOfFlux());
+
+        Assert.Equal(RunStatus.Failure, tree.Tick(AtTheAnvil()));
+        Assert.Equal(CraftStop.UnknownRecipe, craft.Stopped);
     }
 }

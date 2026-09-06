@@ -80,10 +80,10 @@ public static class BotBaseFactory
             "GRIND" => Grind(profile, world),
             "GATHER" => Gather(profile, memory),
             "FISH" => Fish(profile, fishing),
-            "QUESTING" => Questing(profile, behaviors),
+            "QUESTING" => Questing(profile, behaviors, world),
             "DUNGEON" => Dungeon(profile, role),
             "BATTLEGROUND" => Battleground(profile),
-            "CRAFT" => Craft(tradeSkills, crafting),
+            "CRAFT" => Craft(tradeSkills, crafting, world),
             _ => new BotBaseBuild(null, $"'{name}' is not a bot base this build knows about."),
         };
     }
@@ -171,7 +171,8 @@ public static class BotBaseFactory
 
     private static BotBaseBuild Questing(
         Profile? profile,
-        IReadOnlyDictionary<string, Node<IBotState>>? behaviors)
+        IReadOnlyDictionary<string, Node<IBotState>>? behaviors,
+        WorldDataSet? world = null)
     {
         if (profile is null)
         {
@@ -180,11 +181,22 @@ public static class BotBaseFactory
 
         // Running out of quests is what success looks like for a levelling profile, so the
         // fallback is built from the same profile rather than left empty.
-        Node<IBotState> fallback = Grind(profile).Tree!;
+        Node<IBotState> fallback = Grind(profile, world).Tree!;
+
+        // With an export the bot knows which creature a quest wants killed and how many; without
+        // one it works from whatever the profile named, and an objective the profile did not
+        // describe means killing whatever is nearby.
+        QuestObjectives objectives = world is { QuestCount: > 0 }
+            ? new QuestObjectives(world.QuestFor)
+            : QuestObjectives.None;
+
+        string what = $"Questing through {profile.Name}, with {profile.AllSteps().Count()} step(s).";
 
         return new BotBaseBuild(
-            new QuestingBotBase(profile, fallback, behaviors).Build(),
-            $"Questing through {profile.Name}, with {profile.AllSteps().Count()} step(s).");
+            new QuestingBotBase(profile, fallback, behaviors, objectives).Build(),
+            objectives.HasData
+                ? what
+                : what + " No quest data, so it works from what the profile names.");
     }
 
     private static BotBaseBuild Dungeon(Profile? profile, PartyRole role)
@@ -234,7 +246,10 @@ public static class BotBaseFactory
             $"Queueing for {profile.Name}, working {plan.Posts.Count} post(s).");
     }
 
-    private static BotBaseBuild Craft(ITradeSkills? skills, CraftSettings? settings)
+    private static BotBaseBuild Craft(
+        ITradeSkills? skills,
+        CraftSettings? settings,
+        WorldDataSet? world = null)
     {
         if (skills is null)
         {
@@ -251,11 +266,66 @@ public static class BotBaseFactory
                 "Name a profession to work on, as the client spells it.");
         }
 
+        // With world data the base can walk to a vendor when the bags run dry; without it, it
+        // stops with a reason, which is what it did before there was any world data to read.
+        Func<uint, int, Vector3, ProfileVendor?>? sellers = VendorSelling(world);
+
+        SupplyRun? supply = sellers is null
+            ? null
+            : new SupplyRun(new SupplySettings { FindVendor = sellers });
+
+        string what = settings.Recipe.Length > 0
+            ? $"Making {settings.Recipe}"
+            : $"Working {settings.Profession} up";
+
         return new BotBaseBuild(
-            new CraftBotBase(settings).Build(skills),
-            settings.Recipe.Length > 0
-                ? $"Making {settings.Recipe} until the materials run out."
-                : $"Working {settings.Profession} up while the materials last.");
+            new CraftBotBase(settings, supply).Build(skills),
+            supply is null
+                ? $"{what} until the materials run out. No world data, so it cannot buy more."
+                : $"{what}, buying materials when a vendor nearby sells them.");
+    }
+
+    /// <summary>
+    /// Finds a vendor selling an item, from the user's own database export.
+    /// </summary>
+    /// <remarks>
+    /// Null when there is no export, which is the ordinary case and switches the shopping off
+    /// rather than approximating it. Which vendor stocks what is server data: this project ships
+    /// none of it and will not guess at it.
+    /// </remarks>
+    private static Func<uint, int, Vector3, ProfileVendor?>? VendorSelling(WorldDataSet? world)
+    {
+        if (world is not { CreatureTemplateCount: > 0 })
+        {
+            return null;
+        }
+
+        return (itemEntry, mapId, near) =>
+        {
+            IReadOnlyList<uint> sellers = world.VendorsSelling(itemEntry);
+
+            if (sellers.Count == 0)
+            {
+                return null;
+            }
+
+            HashSet<uint> entries = [.. sellers];
+
+            // Nearest first, and only one: the caller walks to it, and if it turns out not to
+            // have the item after all the trip drops it and moves on rather than queueing five
+            // more shops to try.
+            IReadOnlyList<ServiceNpc> found = world.FindServices(
+                mapId, near, template => entries.Contains(template.Entry), limit: 1);
+
+            return found.Count == 0
+                ? null
+                : new ProfileVendor(
+                    found[0].Name,
+                    found[0].Spawn.Entry,
+                    found[0].MapId,
+                    found[0].Position,
+                    found[0].Template.CanRepair);
+        };
     }
 
     /// <summary>Every place a profile names, in written order.</summary>

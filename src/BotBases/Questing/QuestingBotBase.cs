@@ -41,7 +41,9 @@ public sealed class QuestingBotBase
     private readonly ProfileRunner _runner;
     private readonly Node<IBotState>? _fallback;
     private readonly IReadOnlyDictionary<string, Node<IBotState>> _behaviors;
+    private readonly QuestObjectives _objectives;
     private readonly HashSet<string> _reportedMissingBehaviors = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<uint> _describedQuests = [];
 
     /// <summary>Builds a questing base around a profile.</summary>
     /// <param name="profile">The plan to work through.</param>
@@ -54,12 +56,20 @@ public sealed class QuestingBotBase
     /// is not here is reported once and skipped, so an imported profile that mentions behaviours
     /// this bot does not have still runs the rest of its steps.
     /// </param>
+    /// <param name="objectives">
+    /// What each quest actually asks for, from the user's world data. Omit and objective steps
+    /// work only from what the profile names, which is what they did before there was an export
+    /// to read: an objective the profile did not describe falls back to killing whatever is
+    /// nearby.
+    /// </param>
     public QuestingBotBase(
         Profile profile,
         Node<IBotState>? fallback = null,
-        IReadOnlyDictionary<string, Node<IBotState>>? behaviors = null)
+        IReadOnlyDictionary<string, Node<IBotState>>? behaviors = null,
+        QuestObjectives? objectives = null)
     {
-        _runner = new ProfileRunner(profile);
+        _objectives = objectives ?? QuestObjectives.None;
+        _runner = new ProfileRunner(profile, _objectives);
         _fallback = fallback;
         _behaviors = behaviors ?? new Dictionary<string, Node<IBotState>>(StringComparer.OrdinalIgnoreCase);
     }
@@ -251,7 +261,15 @@ public sealed class QuestingBotBase
         _ => WorkTheArea(state, step),
     };
 
-    /// <summary>Kills what the objective names, wherever the profile says they are.</summary>
+    /// <summary>
+    /// Kills what the objective names, wherever the profile says they are.
+    /// </summary>
+    /// <remarks>
+    /// What counts as "what the objective names" is the profile's entry when it gives one, the
+    /// quest's own creature list when the user has a world data export, and anything at all
+    /// when neither says. The last of those is the case worth avoiding: a step that kills
+    /// whatever walks past finishes by luck, and only if the right thing happens to walk past.
+    /// </remarks>
     private RunStatus Fight(IBotState state, ProfileStep step)
     {
         if (state.Target is { IsAlive: true })
@@ -259,9 +277,11 @@ public sealed class QuestingBotBase
             return RunStatus.Running;
         }
 
+        IReadOnlySet<uint> wanted = Wanted(step);
+
         CandidateTarget? candidate = state.NearbyEnemies
             .Where(enemy => enemy.IsAlive)
-            .Where(enemy => step.Entry == 0 || enemy.Entry == step.Entry)
+            .Where(enemy => wanted.Count == 0 || wanted.Contains(enemy.Entry))
             .Where(enemy => !Profile.AvoidMobs.Contains(enemy.Entry))
             .Where(enemy => !enemy.IsInCombat || enemy.IsTargetingMe)
             .Where(enemy => !Profile.IsBlacklisted(state.MapId, enemy.Position))
@@ -277,10 +297,33 @@ public sealed class QuestingBotBase
         return WorkTheArea(state, step);
     }
 
+    /// <summary>
+    /// The creature and object entries a step should be working towards.
+    /// </summary>
+    /// <remarks>
+    /// Empty means "anything", which is what an objective with no entry and no world data has
+    /// always meant. Said once per quest in the log, because knowing the bot has narrowed a
+    /// step down is worth a line and repeating it every tick is not.
+    /// </remarks>
+    private IReadOnlySet<uint> Wanted(ProfileStep step)
+    {
+        IReadOnlySet<uint> wanted = _objectives.KillsFor(step);
+
+        if (step.Entry == 0 && wanted.Count > 0 && _describedQuests.Add(step.QuestId))
+        {
+            Log.For<QuestingBotBase>().Information(
+                "Quest {QuestId} ({QuestName}) wants {Objectives}; the profile did not say, so "
+                + "the entries come from world data",
+                step.QuestId, step.QuestName, _objectives.Describe(step));
+        }
+
+        return wanted;
+    }
+
     /// <summary>Walks to what the objective names and interacts with it.</summary>
     private RunStatus Touch(IBotState state, ProfileStep step)
     {
-        if (Nearest(state, step.Entry) is { } thing)
+        if (Nearest(state, Wanted(step)) is { } thing)
         {
             if (thing.Distance > InteractRange)
             {
@@ -297,6 +340,16 @@ public sealed class QuestingBotBase
     /// <summary>Uses the item the objective names, once in place.</summary>
     private RunStatus Use(IBotState state, ProfileStep step)
     {
+        if (step.ItemId == 0)
+        {
+            Log.For<QuestingBotBase>().Warning(
+                "Quest {QuestId} has a UseItem objective with no item. The profile has to name "
+                + "one: the item a quest hands out to be used is not in the objectives the "
+                + "database exports.", step.QuestId);
+
+            return RunStatus.Failure;
+        }
+
         if (state.ItemCount(step.ItemId) == 0)
         {
             Log.For<QuestingBotBase>().Warning(
@@ -310,7 +363,7 @@ public sealed class QuestingBotBase
         // targeted and in range first.
         if (step.Entry != 0)
         {
-            if (Nearest(state, step.Entry) is not { } victim)
+            if (Nearest(state, Wanted(step)) is not { } victim)
             {
                 return WorkTheArea(state, step);
             }
@@ -479,15 +532,21 @@ public sealed class QuestingBotBase
         return bestDistance == float.MaxValue ? step.Spots[0] : best;
     }
 
-    private static VisibleObject? Nearest(IBotState state, uint entry)
+    private static VisibleObject? Nearest(IBotState state, uint entry) =>
+        entry == 0 ? null : Nearest(state, new HashSet<uint> { entry });
+
+    private static VisibleObject? Nearest(IBotState state, IReadOnlySet<uint> entries)
     {
-        if (entry == 0)
+        // Empty means the bot does not know what it is looking for, which is not the same as
+        // looking for anything: interacting with the nearest object of any kind would open a
+        // mailbox, or a forge, or a quest giver two zones' worth of chain quests deep.
+        if (entries.Count == 0)
         {
             return null;
         }
 
         return state.VisibleObjects
-            .Where(visible => visible.Entry == entry && visible.HasPosition)
+            .Where(visible => entries.Contains(visible.Entry) && visible.HasPosition)
             .Where(visible => visible.Distance <= SearchRange)
             .OrderBy(visible => visible.Distance)
             .Select(visible => (VisibleObject?)visible)

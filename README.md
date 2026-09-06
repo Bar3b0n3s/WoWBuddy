@@ -77,8 +77,9 @@ Read [docs/setup.md](docs/setup.md) first. Then work through the manual test scr
 [2](docs/phase-2-manual-test.md) confirms code can run inside it safely,
 [3](docs/phase-3-manual-test.md) covers movement and click-to-move,
 [4](docs/phase-4-manual-test.md) combat, [5](docs/phase-5-manual-test.md) looting and the
-scheduler, [7](docs/phase-7-manual-test.md) questing, and
-[8](docs/phase-8-manual-test.md) group play and battlegrounds.
+scheduler, [7](docs/phase-7-manual-test.md) questing,
+[8](docs/phase-8-manual-test.md) group play and battlegrounds, and
+[9](docs/phase-9-manual-test.md) professions and buying materials.
 
 ### Reference documentation
 

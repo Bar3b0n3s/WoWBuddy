@@ -10,6 +10,22 @@ zero, anything may change.
 
 ### Added
 
+- **The crafting base buys its materials.** Running out no longer ends the session: the client
+  says what a recipe takes and what the bags hold, `npc-vendors.tsv` says who sells the
+  difference, and `SupplyRun` walks there, buys everything on its list that shop stocks, and
+  comes back to the anvil. It stocks up for several batches, keeps money back for repairs, buys
+  what the money allows rather than nothing, and gives up after two trips that do not help.
+  Most trade materials cannot be bought at all, so stopping with a reason is still the ordinary
+  outcome — and the only one without an export.
+- **Objective steps know what the quest wants.** With `quest-templates.tsv` exported, an
+  `Objective` step that names no creature works from the quest's own requirements instead of
+  killing whatever is nearest, and a `Collect` step can be finished by the bags without reading
+  log text in a language the bot cannot parse. What the profile says always wins.
+- **Two more capability probes.** `Reagents` and `Buying`, listing exactly the calls the new
+  scripts make, so a client without them switches the shopping off rather than failing four
+  hours in.
+- **[docs/phase-9-manual-test.md](docs/phase-9-manual-test.md)** — professions, reagents, a
+  merchant's shelves, buying, and a shopping trip end to end.
 - **Mixing activities within a session.** A plan is a priority list of activities with
   conditions and time limits; a minimum dwell and boundary-aligned pre-emption stop a condition
   sitting on its threshold from swapping activities several times a second.
@@ -23,11 +39,17 @@ zero, anything may change.
   gives a rotation what it needs, and `BotRunner` ticks the tree with movement advanced first.
   The Start button composes all of it.
 
+### Changed
+
+- `IVendorActions` gained `MerchantStock` and `Buy`; `ITradeSkills` gained `ReagentsFor`.
+- The walk-to-a-vendor-and-open-its-window step is now `VendorApproach`, shared by the errand
+  handler and the supply run rather than written twice.
+
 ### Missing
 
 - **Evidence.** None of this has run against a real 3.3.5a client. See
   [docs/status.md](docs/status.md) for what that means in practice.
-- A crafting bot base, and buying materials for one.
+- Taking a character to a profession trainer when a skill hits its cap.
 
 ### Added
 
@@ -36,8 +58,7 @@ zero, anything may change.
   log says which is in use.
 - **The Train errand works.** The creature export now carries trainer type and class, which the
   trainer flag alone does not distinguish.
-- **Vendor inventories and quest objectives** are in the export, ready for buying materials and
-  for the questing base to know what a quest actually asks for.
+- **Vendor inventories and quest objectives** are in the export.
 - **The bot can tell an elite from an ordinary mob.** The world data export now carries
   `creature_template`'s rank, faction and level range, and the grind base leaves elites, bosses
   and anything far above the character alone. Rank is not in a unit's descriptors, so without

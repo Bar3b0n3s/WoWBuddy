@@ -108,6 +108,8 @@ public sealed class FakeLua : ILuaEvaluator
             "RequestBattlegroundInstanceInfo", "JoinBattlefield", "AcceptBattlefieldPort",
             "LeaveBattlefield", "GetNumTradeSkills", "GetTradeSkillInfo",
             "GetTradeSkillLine", "DoTradeSkill", "CloseTradeSkill",
+            "GetTradeSkillNumReagents", "GetTradeSkillReagentInfo", "GetTradeSkillReagentItemLink",
+            "GetMerchantNumItems", "GetMerchantItemInfo", "GetMerchantItemLink", "BuyMerchantItem",
             "CanMerchantRepair", "RepairAllItems", "GetRepairAllCost", "GetContainerItemInfo",
             "SendMail", "ClearSendMail", "CloseMerchant", "CloseMail",
             "GetUnspentTalentPoints", "GetTalentInfo", "LearnTalent",

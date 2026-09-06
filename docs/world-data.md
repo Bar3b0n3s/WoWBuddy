@@ -115,7 +115,7 @@ out in [legal-and-licensing.md](legal-and-licensing.md).
 
 ## What the tables buy that memory cannot
 
-Most of what the bot needs it reads out of the client. Three things it cannot:
+Most of what the bot needs it reads out of the client. Five things it cannot:
 
 **Whether a creature is an elite.** This is the big one. Rank is not in a unit's descriptors, so
 from memory an elite looks exactly like an ordinary mob of the same level — the bot finds out by
@@ -129,6 +129,18 @@ behind it matters when the character is level nine.
 **What an item is before you pick it up.** `GetItemInfo` answers only about items already in the
 bags, one round trip at a time. The export answers about any item, which is what a loot decision
 actually needs.
+
+**Who sells a thing.** The client will list what the merchant in front of the character is
+selling and nothing else, so without the export the only way to find out who stocks Weak Flux is
+to walk into every shop. `npc-vendors.tsv` is indexed by the item rather than by the vendor,
+because the question the bot asks is always "who has this" — see the crafting base's shopping
+trip in [activities.md](activities.md).
+
+**What a quest is actually asking for.** The client says how far along an objective is — "3/8" —
+but the words beside it are in whatever language the client is in. The bot can see that
+something is three eighths done and not what the something is. `quest-templates.tsv` says which
+creature and how many, which turns an objective step the profile did not describe from "kill
+whatever is nearby and hope" into something specific.
 
 Without the export the bot still runs — the target filter rejects nothing it cannot look up,
 because refusing everything unknown would stop a bot that had been working perfectly well. It
@@ -160,6 +172,10 @@ columns would produce a hostility table that looks entirely reasonable and is wr
 
 The Train errand needs the trainer columns: the trainer flag alone is on profession trainers,
 mount vendors and pet trainers too, and none of them teaches a warrior how to hit things.
+
+A profile that names the creature for every objective needs none of `quest-templates.tsv`, and a
+character crafting from materials it gathers itself needs none of `npc-vendors.tsv`. Both exports
+are there for the cases where nothing else can answer.
 
 ## Public dumps, for users without a server
 

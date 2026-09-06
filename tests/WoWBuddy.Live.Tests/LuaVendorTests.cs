@@ -220,4 +220,129 @@ public sealed class LuaVendorTests
         // posted, so the script drops the row.
         Assert.Contains("if name and price then", LuaVendor.ReadBagsScript, StringComparison.Ordinal);
     }
+
+    // ---- buying ---------------------------------------------------------------------------
+
+    private static string Shelf(
+        int index,
+        uint itemId,
+        string name,
+        long price = 100,
+        int stackSize = 1,
+        int available = MerchantItem.Unlimited) =>
+        string.Join(Field, index, itemId, name, price, stackSize, available);
+
+    [Fact]
+    public void ReadsTheMerchantsShelvesInOneRoundTrip()
+    {
+        FakeLua lua = WithMerchant();
+        lua.Answers["__wowbuddy_result"] = string.Join(Row,
+            Shelf(1, 2880, "Weak Flux", price: 10, stackSize: 1),
+            Shelf(2, 2320, "Coarse Thread", price: 100, stackSize: 5, available: 3));
+
+        LuaVendor vendor = Build(lua);
+        IReadOnlyList<MerchantItem> stock = vendor.MerchantStock;
+
+        Assert.Equal(2, stock.Count);
+
+        Assert.Equal(2880u, stock[0].ItemId);
+        Assert.True(stock[0].InStock);
+
+        // A limited shelf can only supply what it has, however much is wanted.
+        Assert.Equal(15, stock[1].Obtainable(100));
+        Assert.Equal(1, vendor.StockReads);
+    }
+
+    [Fact]
+    public void WithNoMerchantOpenTheShelvesAreEmptyWithoutAsking()
+    {
+        // The client can answer a stale item count for a moment after the window closes, and
+        // buying by index into a list belonging to a shop the character walked away from buys
+        // the wrong thing.
+        FakeLua lua = WithMerchant(open: false);
+        lua.Answers["__wowbuddy_result"] = Shelf(1, 2880, "Weak Flux");
+
+        LuaVendor vendor = Build(lua);
+
+        Assert.Empty(vendor.MerchantStock);
+        Assert.Equal(0, vendor.StockReads);
+    }
+
+    [Fact]
+    public void BuyingAsksTheClientForTheShelfsOwnIndex()
+    {
+        FakeLua lua = WithMerchant();
+        lua.Answers["__wowbuddy_result"] = Shelf(4, 2880, "Weak Flux", price: 10);
+
+        LuaVendor vendor = Build(lua);
+        MerchantItem flux = Assert.Single(vendor.MerchantStock);
+
+        Assert.True(vendor.Buy(flux, 20));
+        Assert.Contains("execute: BuyMerchantItem(4, 20)", lua.Asked);
+    }
+
+    [Fact]
+    public void NothingIsBoughtWithTheWindowShut()
+    {
+        // The same guard as selling, and for the same reason: what a client call does depends
+        // on what happens to be open.
+        FakeLua lua = WithMerchant(open: false);
+        LuaVendor vendor = Build(lua);
+
+        Assert.False(vendor.Buy(new MerchantItem(1, 2880, "Weak Flux", 10, 1, -1), 5));
+        Assert.DoesNotContain(lua.Asked, asked => asked.Contains("execute: BuyMerchantItem", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void BuyingNothingIsNotAPurchase()
+    {
+        FakeLua lua = WithMerchant();
+        LuaVendor vendor = Build(lua);
+
+        Assert.False(vendor.Buy(new MerchantItem(1, 2880, "Weak Flux", 10, 1, -1), 0));
+        Assert.DoesNotContain(lua.Asked, asked => asked.Contains("execute: BuyMerchantItem", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void WithoutTheBuyingCallsNothingIsReadOrBought()
+    {
+        FakeLua lua = WithMerchant();
+        lua.Functions.Remove("BuyMerchantItem");
+        lua.Answers["__wowbuddy_result"] = Shelf(1, 2880, "Weak Flux");
+
+        LuaVendor vendor = Build(lua);
+
+        Assert.Empty(vendor.MerchantStock);
+        Assert.False(vendor.Buy(new MerchantItem(1, 2880, "Weak Flux", 10, 1, -1), 5));
+    }
+
+    [Fact]
+    public void BuyingForgetsBothTheBagsAndTheShelves()
+    {
+        // A purchase changes the bags, the shelves, and a limited-stock vendor's count with
+        // them, so every reading taken a moment ago is now wrong.
+        FakeLua lua = WithMerchant();
+        lua.Answers["__wowbuddy_result"] = Shelf(1, 2880, "Weak Flux", price: 10);
+
+        LuaVendor vendor = Build(lua);
+        MerchantItem flux = Assert.Single(vendor.MerchantStock);
+
+        vendor.Buy(flux, 5);
+
+        Assert.Single(vendor.MerchantStock);
+        Assert.Equal(2, vendor.StockReads);
+    }
+
+    [Fact]
+    public void AShelfRowThatCannotBeReadIsSkippedRatherThanGuessedAt()
+    {
+        FakeLua lua = WithMerchant();
+        lua.Answers["__wowbuddy_result"] = string.Join(Row,
+            "nonsense",
+            Shelf(2, 2880, "Weak Flux"));
+
+        MerchantItem flux = Assert.Single(Build(lua).MerchantStock);
+
+        Assert.Equal(2880u, flux.ItemId);
+    }
 }

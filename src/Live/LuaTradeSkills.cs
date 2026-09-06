@@ -58,14 +58,45 @@ public sealed class LuaTradeSkills : ITradeSkills
         __wowbuddy_result = table.concat(rows, "\30")
         """;
 
+    /// <summary>
+    /// Reads what one recipe is made from.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The item id comes out of the reagent's hyperlink, the same trick the quest log reader
+    /// uses, because <c>GetTradeSkillReagentInfo</c> gives a name and a count and no id — and a
+    /// name cannot be looked up in a vendor table without knowing the client's language.
+    /// </para>
+    /// <para>
+    /// A reagent whose link the client has not cached yet comes back with an id of zero rather
+    /// than a guess. The caller skips those, which costs a trip for that one material and never
+    /// buys the wrong thing.
+    /// </para>
+    /// </remarks>
+    internal const string ReadReagentsScript = """
+        local rows = {}
+        local index = {0}
+        for i = 1, (GetTradeSkillNumReagents(index) or 0) do
+            local name, _, needed, have = GetTradeSkillReagentInfo(index, i)
+            local link = GetTradeSkillReagentItemLink(index, i)
+            local id = link and string.match(link, "item:(%d+)") or 0
+            if name then
+                rows[#rows + 1] = id .. "\31" .. name .. "\31" .. (needed or 0)
+                    .. "\31" .. (have or 0)
+            end
+        end
+        __wowbuddy_result = table.concat(rows, "\30")
+        """;
+
     private readonly ILuaEvaluator _lua;
     private readonly CapabilityReport _capabilities;
     private readonly Func<DateTimeOffset> _clock;
+    private readonly Dictionary<int, IReadOnlyList<TradeSkillReagent>> _reagents = [];
 
     private IReadOnlyList<TradeSkillRecipe> _recipes = [];
     private TradeSkillLine _line;
     private DateTimeOffset _readAt = DateTimeOffset.MinValue;
-    private bool _warned;
+    private readonly HashSet<GameCapability> _warned = [];
 
     /// <summary>Reads the trade skills of a client.</summary>
     public LuaTradeSkills(
@@ -127,6 +158,65 @@ public sealed class LuaTradeSkills : ITradeSkills
         }
 
         return best;
+    }
+
+    /// <summary>
+    /// What a recipe is made from, and how much of it the character has.
+    /// </summary>
+    /// <remarks>
+    /// A round trip per recipe, so the answer is cached for as long as the recipe list is: this
+    /// is asked when the crafting base is deciding whether to go shopping, which is exactly the
+    /// moment it is otherwise doing nothing.
+    /// </remarks>
+    public IReadOnlyList<TradeSkillReagent> ReagentsFor(TradeSkillRecipe recipe)
+    {
+        // Refreshing first, because the recipe list going stale is what empties this cache.
+        Refresh();
+
+        if (_reagents.TryGetValue(recipe.Index, out IReadOnlyList<TradeSkillReagent>? cached))
+        {
+            return cached;
+        }
+
+        if (!Supports(GameCapability.Reagents) || recipe.Index <= 0)
+        {
+            return [];
+        }
+
+        _lua.Execute(ReadReagentsScript.Replace(
+            "{0}", recipe.Index.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal));
+
+        if (_lua.Evaluate("__wowbuddy_result") is not { } raw)
+        {
+            // Unknown, not "made from nothing". Caching it would turn one failed round trip
+            // into five seconds of believing a recipe needs no materials.
+            return [];
+        }
+
+        List<TradeSkillReagent> reagents = [];
+
+        foreach (string row in raw.Split(RowSeparator, StringSplitOptions.RemoveEmptyEntries))
+        {
+            string[] fields = row.Split(FieldSeparator);
+
+            if (fields.Length < 4)
+            {
+                Log.For<LuaTradeSkills>().Warning(
+                    "A reagent row could not be read and was skipped: {Row}", row);
+                continue;
+            }
+
+            reagents.Add(new TradeSkillReagent(
+                uint.TryParse(fields[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out uint id)
+                    ? id
+                    : 0u,
+                fields[1],
+                ParseInt(fields[2]),
+                ParseInt(fields[3])));
+        }
+
+        _reagents[recipe.Index] = reagents;
+        return reagents;
     }
 
     /// <summary>Makes something, by name.</summary>
@@ -212,7 +302,11 @@ public sealed class LuaTradeSkills : ITradeSkills
     }
 
     /// <summary>Forgets the last reading.</summary>
-    public void Invalidate() => _readAt = DateTimeOffset.MinValue;
+    public void Invalidate()
+    {
+        _readAt = DateTimeOffset.MinValue;
+        _reagents.Clear();
+    }
 
     /// <summary>Turns the client's own word for a colour into a difficulty.</summary>
     internal static RecipeDifficulty ParseDifficulty(string kind) => kind.ToUpperInvariant() switch
@@ -224,18 +318,18 @@ public sealed class LuaTradeSkills : ITradeSkills
         _ => RecipeDifficulty.Unknown,
     };
 
-    private bool Supports()
+    private bool Supports() => Supports(GameCapability.TradeSkills);
+
+    private bool Supports(GameCapability capability)
     {
-        if (_capabilities.Supports(GameCapability.TradeSkills))
+        if (_capabilities.Supports(capability))
         {
             return true;
         }
 
-        if (!_warned)
+        if (_warned.Add(capability))
         {
-            _warned = true;
-            Log.For<LuaTradeSkills>().Warning(
-                "{Explanation}", _capabilities.Explain(GameCapability.TradeSkills));
+            Log.For<LuaTradeSkills>().Warning("{Explanation}", _capabilities.Explain(capability));
         }
 
         return false;
@@ -251,6 +345,7 @@ public sealed class LuaTradeSkills : ITradeSkills
         }
 
         _readAt = now;
+        _reagents.Clear();
 
         if (!Supports())
         {

@@ -46,6 +46,32 @@ public readonly record struct TradeSkillRecipe(
     public override string ToString() => $"{Name} ({Difficulty}, {Available} makeable)";
 }
 
+/// <summary>
+/// One of the things a recipe is made from.
+/// </summary>
+/// <remarks>
+/// Read out of the open trade skill window rather than from any table this project ships: the
+/// client already knows what a recipe takes and how much of it the character is carrying, and
+/// the answer is right for whatever server the user is on.
+/// </remarks>
+/// <param name="ItemId">The item, which is what a vendor is searched for by.</param>
+/// <param name="Name">What it is called, for logs.</param>
+/// <param name="Needed">How many one craft takes.</param>
+/// <param name="Have">How many the character is carrying.</param>
+public readonly record struct TradeSkillReagent(uint ItemId, string Name, int Needed, int Have)
+{
+    /// <summary>How many more are needed to make one.</summary>
+    public int Short => Math.Max(0, Needed - Have);
+
+    /// <summary>True when there are not enough to make one.</summary>
+    public bool IsShort => Short > 0;
+
+    /// <summary>How many more are needed to make <paramref name="count"/> of them.</summary>
+    public int ShortFor(int count) => Math.Max(0, (Needed * Math.Max(0, count)) - Have);
+
+    public override string ToString() => $"{Name} ({Have}/{Needed})";
+}
+
 /// <summary>Which profession window is open, and how far along it is.</summary>
 /// <param name="Name">The profession, as the client names it.</param>
 /// <param name="Rank">Current skill.</param>
@@ -80,6 +106,16 @@ public interface ITradeSkills
 
     /// <summary>The best thing to make to raise the skill, or null when nothing would.</summary>
     TradeSkillRecipe? BestForSkillUp();
+
+    /// <summary>
+    /// What a recipe is made from, and how much of it the character has.
+    /// </summary>
+    /// <remarks>
+    /// Empty when the client cannot say — an older client, a missing call, a recipe that is not
+    /// in the open window. Empty means unknown rather than "nothing", so callers treat it as a
+    /// reason not to go shopping rather than as a shopping list of nothing.
+    /// </remarks>
+    IReadOnlyList<TradeSkillReagent> ReagentsFor(TradeSkillRecipe recipe);
 
     /// <summary>Makes something. Returns how many it asked for, or zero.</summary>
     int Craft(TradeSkillRecipe recipe, int count = 1);

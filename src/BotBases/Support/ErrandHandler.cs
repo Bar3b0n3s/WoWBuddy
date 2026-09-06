@@ -70,17 +70,15 @@ public sealed class ErrandHandler
 {
     private readonly ErrandHandlerSettings _settings;
     private readonly LootRules _loot;
-    private readonly Func<DateTimeOffset> _clock;
+    private readonly VendorApproach _approach;
 
-    private DateTimeOffset _waitingSince = DateTimeOffset.MinValue;
-    private Errand _waitingFor = Errand.None;
     private Vector3 _lastPosition;
 
     public ErrandHandler(ErrandHandlerSettings? settings = null, Func<DateTimeOffset>? clock = null)
     {
         _settings = settings ?? new ErrandHandlerSettings();
         _loot = new LootRules(_settings.Loot);
-        _clock = clock ?? (() => DateTimeOffset.UtcNow);
+        _approach = new VendorApproach(_settings.InteractRange, _settings.WindowTimeout, clock);
     }
 
     /// <summary>Where it would go for an errand, or null when it knows nowhere.</summary>
@@ -124,26 +122,16 @@ public sealed class ErrandHandler
             return Abandon();
         }
 
-        float distance = state.Position.Distance(destination.Position);
-
-        if (distance > _settings.InteractRange)
+        switch (_approach.Step(state, destination, wantMailbox: errand == Errand.Mail))
         {
-            return state.MoveTo(destination.Position) && !state.MovementFailed
-                ? RunStatus.Running
-                : Abandon($"Could not reach {destination.Name}");
-        }
+            case ApproachResult.Travelling:
+                return RunStatus.Running;
 
-        state.StopMoving();
+            case ApproachResult.Failed:
+                return Abandon(_approach.Failure);
+        }
 
         IVendorActions vendor = state.Vendor;
-        bool open = errand == Errand.Mail ? vendor.IsMailboxOpen : vendor.IsMerchantOpen;
-
-        if (!open)
-        {
-            return OpenWindow(state, errand, destination);
-        }
-
-        _waitingFor = Errand.None;
 
         return errand switch
         {
@@ -152,53 +140,6 @@ public sealed class ErrandHandler
             Errand.Mail => DoMail(vendor),
             _ => Abandon(),
         };
-    }
-
-    /// <summary>
-    /// Clicks the vendor, and gives up if the window never appears.
-    /// </summary>
-    /// <remarks>
-    /// The character can be in the right place with no window: the vendor wandered off, the
-    /// click missed, something interrupted it. Waiting forever would leave the bot clicking at
-    /// nothing for the rest of the session.
-    /// </remarks>
-    private RunStatus OpenWindow(IBotState state, Errand errand, ProfileVendor destination)
-    {
-        DateTimeOffset now = _clock();
-
-        if (_waitingFor != errand)
-        {
-            _waitingFor = errand;
-            _waitingSince = now;
-        }
-        else if (now - _waitingSince > _settings.WindowTimeout)
-        {
-            return Abandon($"{destination.Name} did not open a window");
-        }
-
-        VisibleObject? target = null;
-
-        foreach (VisibleObject visible in state.VisibleObjects)
-        {
-            if (visible.Entry == destination.Entry && visible.HasPosition)
-            {
-                target = visible;
-                break;
-            }
-        }
-
-        // A mailbox is a game object and appears in the visible list; a vendor is a creature and
-        // may not, in which case interacting by the profile's own entry is not possible and the
-        // bot has to give up rather than click at the ground.
-        if (target is not { } found)
-        {
-            return now - _waitingSince > _settings.WindowTimeout
-                ? Abandon($"Could not see {destination.Name}")
-                : RunStatus.Running;
-        }
-
-        state.Interact(found.Guid);
-        return RunStatus.Running;
     }
 
     private RunStatus DoRepair(IVendorActions vendor)
@@ -285,7 +226,7 @@ public sealed class ErrandHandler
 
     private RunStatus Finish()
     {
-        _waitingFor = Errand.None;
+        _approach.Reset();
         return RunStatus.Success;
     }
 
@@ -296,7 +237,7 @@ public sealed class ErrandHandler
             Log.For<ErrandHandler>().Warning("Giving up on the errand: {Reason}", reason);
         }
 
-        _waitingFor = Errand.None;
+        _approach.Reset();
         return RunStatus.Failure;
     }
 

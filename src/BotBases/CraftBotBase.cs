@@ -69,9 +69,11 @@ public enum CraftStop
 /// worth making and keep asking.
 /// </para>
 /// <para>
-/// <b>It does not buy materials.</b> It makes what the character is carrying and then stops
-/// with a reason, which is a better outcome than standing at a vendor working out what a recipe
-/// needs — that would take item data this project does not ship.
+/// <b>It buys materials when it can, and stops with a reason when it cannot.</b> The client
+/// says what a recipe takes; the user's world data says who sells it; between them the base can
+/// walk to a vendor, restock and carry on. Most trade materials are gathered rather than sold,
+/// so stopping is still the ordinary outcome — but stopping for want of a stack of thread is
+/// not, and that is the case this fixes.
 /// </para>
 /// <para>
 /// Every way it can stop is a named reason rather than silence, because a crafting session that
@@ -80,14 +82,34 @@ public enum CraftStop
 /// </remarks>
 public sealed class CraftBotBase
 {
+    /// <summary>
+    /// How many shopping trips are worth making before giving up.
+    /// </summary>
+    /// <remarks>
+    /// Two, because a trip that comes back and still leaves the recipe unmakeable means the
+    /// bot has misunderstood something — the wrong item id, a vendor that sells one of the four
+    /// reagents — and a third trip would misunderstand it again. Walking back and forth all
+    /// evening is worse than stopping with a reason.
+    /// </remarks>
+    public const int MaxSupplyRuns = 2;
+
     private readonly CraftSettings _settings;
+    private readonly SupplyRun? _supply;
 
     private CraftStop _stopped = CraftStop.None;
     private bool _reported;
+    private int _trips;
 
-    public CraftBotBase(CraftSettings? settings = null)
+    /// <summary>Builds a crafting base.</summary>
+    /// <param name="settings">What to make, and how much of it.</param>
+    /// <param name="supply">
+    /// How to restock when the materials run out. Omit and the base stops instead, which is
+    /// what it did before world data existed and is still right when there is none.
+    /// </param>
+    public CraftBotBase(CraftSettings? settings = null, SupplyRun? supply = null)
     {
         _settings = settings ?? new CraftSettings();
+        _supply = supply;
     }
 
     /// <summary>What it is making.</summary>
@@ -114,7 +136,12 @@ public sealed class CraftBotBase
         _stopped = CraftStop.None;
         _reported = false;
         Crafted = 0;
+        _trips = 0;
+        _supply?.Reset();
     }
+
+    /// <summary>How many shopping trips it has made.</summary>
+    public int SupplyRuns => _trips;
 
     private RunStatus Tick(IBotState state, ITradeSkills skills)
     {
@@ -126,6 +153,13 @@ public sealed class CraftBotBase
         if (!_settings.IsUsable)
         {
             return Stop(CraftStop.NotConfigured, "No profession was named.");
+        }
+
+        // Before the window, because there is no window while the character is walking to a
+        // shop: casting the profession again here would cancel its own journey every tick.
+        if (ContinueTrip(state) is { } shopping)
+        {
+            return shopping;
         }
 
         if (!skills.Line.IsOpen)
@@ -153,20 +187,135 @@ public sealed class CraftBotBase
 
         if (Choose(skills) is not { } recipe)
         {
-            return _settings.Recipe.Length > 0 && !Knows(skills, _settings.Recipe)
-                ? Stop(CraftStop.UnknownRecipe, $"The character does not know how to make {_settings.Recipe}.")
-                : Stop(CraftStop.OutOfMaterials, "Nothing left to make.");
+            if (_settings.Recipe.Length > 0 && !Knows(skills, _settings.Recipe))
+            {
+                return Stop(
+                    CraftStop.UnknownRecipe,
+                    $"The character does not know how to make {_settings.Recipe}.");
+            }
+
+            return GoShopping(state, skills)
+                ?? Stop(CraftStop.OutOfMaterials, ShoppingFailure("Nothing left to make."));
         }
 
         int made = skills.Craft(recipe, _settings.BatchSize);
 
         if (made == 0)
         {
-            return Stop(CraftStop.OutOfMaterials, $"Nothing left to make {recipe.Name} from.");
+            return GoShopping(state, skills)
+                ?? Stop(
+                    CraftStop.OutOfMaterials,
+                    ShoppingFailure($"Nothing left to make {recipe.Name} from."));
         }
 
         Crafted += made;
         return RunStatus.Running;
+    }
+
+    /// <summary>
+    /// Carries on a shopping trip that is already under way.
+    /// </summary>
+    /// <returns>What the caller should return, or null when there is no trip in progress.</returns>
+    private RunStatus? ContinueTrip(IBotState state)
+    {
+        if (_supply is not { Status: SupplyStatus.Shopping })
+        {
+            return null;
+        }
+
+        SupplyStatus status = _supply.Tick(state);
+
+        if (status == SupplyStatus.Shopping)
+        {
+            return RunStatus.Running;
+        }
+
+        // Captured before the reset, which clears it.
+        string explanation = _supply.Explanation;
+        int bought = _supply.Bought;
+
+        _supply.Reset();
+
+        if (status == SupplyStatus.Done)
+        {
+            Log.For<CraftBotBase>().Information(
+                "Back from the shops with {Count} item(s); carrying on", bought);
+
+            // Running rather than crafting immediately: the window closed while walking, and
+            // the next tick reopens it against bags that have had a moment to catch up.
+            return RunStatus.Running;
+        }
+
+        return Stop(CraftStop.OutOfMaterials, explanation);
+    }
+
+    /// <summary>
+    /// Sets off to buy what the recipe is short of.
+    /// </summary>
+    /// <returns>What the caller should return, or null when shopping is not possible.</returns>
+    private RunStatus? GoShopping(IBotState state, ITradeSkills skills)
+    {
+        if (_supply is null || _trips >= MaxSupplyRuns)
+        {
+            return null;
+        }
+
+        // What it would make if it had the materials, which is not what Choose answers: Choose
+        // only offers recipes there are materials for, and by here there are none.
+        if (Wanted(skills) is not { } recipe)
+        {
+            return null;
+        }
+
+        if (!_supply.Begin(state, skills, recipe, _settings.BatchSize))
+        {
+            Log.For<CraftBotBase>().Information(
+                "Not going shopping: {Reason}", _supply.Explanation);
+
+            return null;
+        }
+
+        _trips++;
+        return RunStatus.Running;
+    }
+
+    /// <summary>Adds why the shopping did not save the day, when it was tried.</summary>
+    private string ShoppingFailure(string message) =>
+        _trips > 0 ? $"{message} {_trips} shopping trip(s) did not fix it." : message;
+
+    /// <summary>
+    /// What the character would make if it had the materials.
+    /// </summary>
+    /// <remarks>
+    /// Availability is ignored deliberately. This is only asked when nothing is makeable, and
+    /// the question being answered is what to go shopping for.
+    /// </remarks>
+    private TradeSkillRecipe? Wanted(ITradeSkills skills)
+    {
+        if (_settings.Recipe.Length > 0)
+        {
+            foreach (TradeSkillRecipe recipe in skills.Recipes)
+            {
+                if (string.Equals(recipe.Name, _settings.Recipe, StringComparison.OrdinalIgnoreCase))
+                {
+                    return recipe;
+                }
+            }
+
+            return null;
+        }
+
+        TradeSkillRecipe? best = null;
+
+        foreach (TradeSkillRecipe recipe in skills.Recipes)
+        {
+            if (recipe.RaisesSkill && (best is null || recipe.Difficulty < best.Value.Difficulty))
+            {
+                best = recipe;
+            }
+        }
+
+        return best;
     }
 
     /// <summary>

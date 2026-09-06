@@ -2,6 +2,7 @@ using WoWBuddy.Behavior;
 using WoWBuddy.BotBases.Questing;
 using WoWBuddy.Common.Geometry;
 using WoWBuddy.Profiles;
+using WoWBuddy.WorldData;
 using Xunit;
 
 namespace WoWBuddy.BotBases.Tests;
@@ -335,5 +336,97 @@ public sealed class QuestingBotBaseTests
             new ProfileStep(StepKind.PickUp, QuestId: 9001, Entry: 8100)));
 
         Assert.Equal(RunStatus.Failure, questing.Build().Tick(new FakeBotState()));
+    }
+
+
+    // ---- objectives from world data --------------------------------------------------------
+
+    private static QuestObjectives Knowing(QuestTemplate quest) =>
+        new(id => id == quest.Id ? quest : null);
+
+    [Fact]
+    public void AnObjectiveTheProfileDidNotDescribeKillsWhatTheQuestActuallyWants()
+    {
+        // Without an export this step kills whatever is nearest, and finishes by luck. The
+        // user's own quest table is what turns it into something specific.
+        QuestingBotBase questing = new(
+            Quest(new ProfileStep(StepKind.Objective, QuestId: 9001, Position: Field,
+                Objective: ObjectiveKind.Kill, Radius: 80f)),
+            fallback: null,
+            behaviors: null,
+            Knowing(new QuestTemplate(
+                9001, "Kobold Camp Cleanup", 5, 6,
+                [new QuestRequirement(8200, 8, IsItem: false)])));
+
+        FakeBotState state = new() { Position = Field };
+
+        // The nearer one is not what the quest wants.
+        state.AddEnemy(1, distance: 20f, entry: 9999);
+        CandidateTarget wanted = state.AddEnemy(2, distance: 50f, entry: 8200);
+        state.QuestLog.Add(9001);
+
+        Assert.Equal(RunStatus.Running, questing.Build().Tick(state));
+        Assert.Equal(wanted.Guid, state.Target!.Value.Guid);
+    }
+
+    [Fact]
+    public void WithoutQuestDataTheSameStepStillKillsWhateverIsNearest()
+    {
+        // The behaviour before the export existed, kept deliberately: a step that narrows to
+        // nothing would stand still, which is worse than killing the wrong thing.
+        QuestingBotBase questing = new(Quest(
+            new ProfileStep(StepKind.Objective, QuestId: 9001, Position: Field,
+                Objective: ObjectiveKind.Kill, Radius: 80f)));
+
+        FakeBotState state = new() { Position = Field };
+        CandidateTarget nearest = state.AddEnemy(1, distance: 20f, entry: 9999);
+        state.QuestLog.Add(9001);
+
+        Assert.Equal(RunStatus.Running, questing.Build().Tick(state));
+        Assert.Equal(nearest.Guid, state.Target!.Value.Guid);
+    }
+
+    [Fact]
+    public void ACollectObjectiveIsFinishedByTheBagsEvenWhenTheProfileNamedNoItem()
+    {
+        // The quest log counts an item only once it is in the bags, and says so in a language
+        // the bot cannot read. The export says which item and how many.
+        ProfileStep collect = new(
+            StepKind.Objective, QuestId: 9001, Position: Field, Objective: ObjectiveKind.Collect);
+
+        QuestObjectives objectives = Knowing(new QuestTemplate(
+            9001, "Linen for the Guard", 5, 6,
+            [new QuestRequirement(2589, 10, IsItem: true)]));
+
+        QuestingBotBase questing = new(
+            Quest(collect), fallback: null, behaviors: null, objectives);
+
+        FakeBotState state = new() { Position = Field };
+        state.QuestLog.Add(9001);
+        state.Items[2589] = 10;
+
+        // Nothing left to do, and no fallback, so the base stands still rather than working a
+        // step the bags have already finished.
+        Assert.False(questing.Current(state).HasStep);
+    }
+
+    [Fact]
+    public void ACollectObjectiveIsStillOpenWhileTheBagsAreShort()
+    {
+        ProfileStep collect = new(
+            StepKind.Objective, QuestId: 9001, Position: Field, Objective: ObjectiveKind.Collect);
+
+        QuestObjectives objectives = Knowing(new QuestTemplate(
+            9001, "Linen for the Guard", 5, 6,
+            [new QuestRequirement(2589, 10, IsItem: true)]));
+
+        QuestingBotBase questing = new(
+            Quest(collect), fallback: null, behaviors: null, objectives);
+
+        FakeBotState state = new() { Position = Field };
+        state.QuestLog.Add(9001);
+        state.Items[2589] = 9;
+
+        Assert.True(questing.Current(state).HasStep);
     }
 }

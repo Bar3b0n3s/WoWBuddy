@@ -25,11 +25,16 @@ calls. Installing the hook is a separate, explicit step from attaching.
 AzerothCore format, pathfinding through them, smoothing, following a path, and detecting and
 recovering from being stuck.
 
-**Deciding.** A behaviour tree; six bot bases (grind, gather, fish, questing, dungeon,
-battleground); thirty combat routines, one per specialisation; profiles with a validating
+**Deciding.** A behaviour tree; seven bot bases (grind, gather, fish, questing, dungeon,
+battleground, craft); thirty combat routines, one per specialisation; profiles with a validating
 loader and a Honorbuddy importer; loot rules, gear evaluation and errand planning; a session
 scheduler with randomised breaks; group play — following, assisting, role-aware behaviour,
 group healing; plugins.
+
+**Using a world data export.** Where the herbs and vendors are, which creatures are elites,
+which trainer teaches which class, who sells a given item, and what each quest actually asks
+for. Everything that depends on it degrades to how the bot behaved before it existed, and the
+status line says which of the two is in use.
 
 **The console tool.** `WoWBuddy.Inspector` exposes the reading and execution layers directly:
 `list`, `inspect`, `watch`, `offsets`, `exec`, `lua`, `ctm`, `nav`, `worlddata`. It is the right
@@ -62,7 +67,7 @@ Specifically unproven:
 what the last one proved, and reporting what you saw is the most useful thing anyone can do for
 this project right now.
 
-### Four things the bot will not work out for itself
+### Six things the bot will not work out for itself
 
 The window asks, keeps the answer, and never guesses:
 
@@ -87,14 +92,32 @@ involved. Without it the bot excludes players and anything wearing NPC flags and
 as fair game, which will occasionally offer a neutral critter as a target. The log says which is
 in use.
 
-### Nothing buys materials yet
+### The crafting base buys materials, but only the buyable kind
 
-The crafting base makes what the character is carrying and then stops. `npc-vendors.tsv` now
-says who sells what, so the data is there; the loop that walks to a vendor and buys is not
-written.
+With `npc-vendors.tsv` exported, running out of materials sends the character to a shop instead
+of stopping: the client says what the recipe takes and what the bags hold, the export says who
+sells the difference, and the bot walks there, buys, and comes back to the anvil.
+
+Most trade materials cannot be bought at all — ore, herbs, leather and cloth come off the world
+— so stopping is still the ordinary outcome, and with no export it is the only outcome. What
+this fixes is the narrower case of a session ending for want of a stack of thread.
 
 The `Train` errand does work when world data is exported — the creature table says which trainer
-teaches which class, which the trainer flag alone does not.
+teaches which class, which the trainer flag alone does not. Profession trainers are still out of
+reach: the bot does not read a trainer's window, so it cannot tell learning a new rank from
+buying a recipe, and hitting the skill cap stops the session rather than fixing itself.
+
+### Objective steps know what a quest wants, given the export
+
+`quest-templates.tsv` says which creature a quest wants killed and how many. Without it, an
+objective step the profile did not describe kills whatever is nearest and finishes by luck;
+with it, the step is specific. A profile that names its own entries needs none of this, and what
+the profile says always wins.
+
+The client's own objective order is assumed to match the database's column order, which is what
+makes a step saying `Index="2"` mean something. That is unverified — see the assumptions table
+below — and an index past the end falls back to using every requirement, so being wrong costs
+precision rather than correctness.
 
 ## Outstanding assumptions
 
@@ -108,6 +131,9 @@ code, and each has a manual test script section that checks it.
 | `RequestBattlegroundInstanceInfo` and `JoinBattlefield` take the indices assumed | `LuaBattlegrounds` | [phase 8](phase-8-manual-test.md) §7 |
 | `GetBattlefieldInstanceRunTime` above zero means the gates are open | `LuaBattlegrounds` | [phase 8](phase-8-manual-test.md) §7 |
 | Whether `UnitGroupRolesAssigned` exists on 12340 at all | capability probe | [phase 8](phase-8-manual-test.md) §2 |
+| `GetTradeSkillReagentInfo` returns needed and carried in that order | `LuaTradeSkills` | [phase 9](phase-9-manual-test.md) §2 |
+| `BuyMerchantItem` counts individual items rather than purchases | `LuaVendor` | [phase 9](phase-9-manual-test.md) §4 |
+| The client's objective order matches the database's column order | `QuestObjectives` | [phase 9](phase-9-manual-test.md) §6 |
 | Three offsets remain documented assumptions rather than verified | [offsets.md](offsets.md) | [phase 1](phase-1-manual-test.md) |
 
 **The bot checks what it can, at attach time.** When execution is enabled it asks the client
@@ -134,6 +160,7 @@ what the previous one established:
 | [phase 5](phase-5-manual-test.md) | looting, gear, the scheduler |
 | [phase 7](phase-7-manual-test.md) | the quest log assumptions |
 | [phase 8](phase-8-manual-test.md) | group play, and the battleground queue |
+| [phase 9](phase-9-manual-test.md) | professions, buying materials, quest objectives |
 
 **Botting violates the terms of service of Blizzard's servers and the rules of most private
 servers. Accounts get banned for it.** This project does not attempt to defeat server-side

@@ -15,6 +15,11 @@ public sealed class FakeVendor : IVendorActions
 
     public IReadOnlyList<BagSlot> BagContents => Bags;
 
+    /// <summary>What this vendor is selling.</summary>
+    public List<MerchantItem> Stock { get; } = [];
+
+    public IReadOnlyList<MerchantItem> MerchantStock => IsMerchantOpen ? Stock : [];
+
     /// <summary>What the bot asked the vendor to do, in order.</summary>
     public List<string> Actions { get; } = [];
 
@@ -23,6 +28,9 @@ public sealed class FakeVendor : IVendorActions
 
     /// <summary>Whether a letter can be sent.</summary>
     public bool CanSendMail { get; set; } = true;
+
+    /// <summary>Whether the vendor accepts a purchase.</summary>
+    public bool CanBuy { get; set; } = true;
 
     public bool Repair()
     {
@@ -34,6 +42,12 @@ public sealed class FakeVendor : IVendorActions
     {
         Actions.Add($"Sell({slot.Item.Name})");
         return true;
+    }
+
+    public bool Buy(MerchantItem item, int count)
+    {
+        Actions.Add($"Buy({item.Name}, {count})");
+        return CanBuy;
     }
 
     public bool Mail(string recipient, IReadOnlyList<BagSlot> items)
@@ -48,6 +62,18 @@ public sealed class FakeVendor : IVendorActions
         IsMerchantOpen = false;
         IsMailboxOpen = false;
         return true;
+    }
+
+    /// <summary>Puts something on the vendor's shelves.</summary>
+    public FakeVendor Selling(
+        uint itemId,
+        string name,
+        long price = 10,
+        int stackSize = 1,
+        int available = MerchantItem.Unlimited)
+    {
+        Stock.Add(new MerchantItem(Stock.Count + 1, itemId, name, price, stackSize, available));
+        return this;
     }
 
     /// <summary>Puts a stack in the bags.</summary>
