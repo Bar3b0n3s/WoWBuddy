@@ -76,6 +76,36 @@ public interface ICombatContext
 
     /// <summary>Casts a spell.</summary>
     bool Cast(string spellName, bool onSelf = false);
+
+    // ---- group play, added in phase 8 --------------------------------------------------
+
+    /// <summary>
+    /// The rest of the character's group, nearest first. Empty when playing alone.
+    /// </summary>
+    /// <remarks>
+    /// Defaulted to empty so that every routine written before groups existed still compiles
+    /// and behaves exactly as it did: a rotation that never mentions the group is a solo
+    /// rotation, which is what most of them are.
+    /// </remarks>
+    IReadOnlyList<UnitSnapshot> Group => [];
+
+    /// <summary>
+    /// Casts a spell on someone else.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Separate from <see cref="Cast"/> because healing someone must not disturb the
+    /// character's own target. Retargeting to heal and back again loses casts, breaks
+    /// channelled spells, and on a damage character means the next attack goes at whatever was
+    /// healed. The client can cast directly at a unit without changing target, and this is
+    /// that.
+    /// </para>
+    /// <para>
+    /// Defaulted to failing rather than falling back to <see cref="Cast"/>: a routine asking to
+    /// heal someone specific and silently healing the wrong unit is worse than not healing.
+    /// </para>
+    /// </remarks>
+    bool CastOn(string spellName, UnitSnapshot unit) => false;
 }
 
 /// <summary>
@@ -85,11 +115,16 @@ public interface ICombatContext
 /// <param name="When">When the rule applies. Null means whenever the spell is ready.</param>
 /// <param name="OnSelf">Whether the spell targets the character.</param>
 /// <param name="Description">What the rule is for, shown in logs and the rotation editor.</param>
+/// <param name="Selector">
+/// Picks who to cast at, for rules that heal or buff someone other than the character or its
+/// target. Returning null means the rule does not apply this time.
+/// </param>
 public sealed record RotationRule(
     string SpellName,
     Func<ICombatContext, bool>? When = null,
     bool OnSelf = false,
-    string Description = "")
+    string Description = "",
+    Func<ICombatContext, UnitSnapshot?>? Selector = null)
 {
     /// <summary>True when this rule should fire in the given situation.</summary>
     public bool Applies(ICombatContext context)
@@ -98,7 +133,28 @@ public sealed record RotationRule(
 
         // Readiness is checked first because it is cheap and rules out most rules; the
         // condition may cost a round trip to the client.
-        return context.IsSpellReady(SpellName) && (When is null || When(context));
+        if (!context.IsSpellReady(SpellName) || (When is not null && !When(context)))
+        {
+            return false;
+        }
+
+        // A rule that names who to cast at does not apply when there is nobody to cast at.
+        // That is what lets "heal whoever is hurt" sit in a rotation without a condition
+        // repeating the same search.
+        return Selector is null || Selector(context) is not null;
+    }
+
+    /// <summary>Casts this rule.</summary>
+    public bool Fire(ICombatContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        if (Selector is null)
+        {
+            return context.Cast(SpellName, OnSelf);
+        }
+
+        return Selector(context) is { } unit && context.CastOn(SpellName, unit);
     }
 
     public override string ToString() =>
@@ -144,6 +200,19 @@ public sealed class Rotation
         string description = "") =>
         Add(new RotationRule(spellName, when, onSelf, description));
 
+    /// <summary>Adds a rule that casts at whoever <paramref name="on"/> picks.</summary>
+    /// <remarks>
+    /// The healing form. The selector runs during the decision, so "whoever is most hurt" is
+    /// evaluated against the same snapshot as everything else in the rotation rather than
+    /// against a group that may have changed since.
+    /// </remarks>
+    public Rotation CastOn(
+        string spellName,
+        Func<ICombatContext, UnitSnapshot?> on,
+        Func<ICombatContext, bool>? when = null,
+        string description = "") =>
+        Add(new RotationRule(spellName, when, OnSelf: false, description, on));
+
     /// <summary>
     /// Casts the highest-priority rule that applies.
     /// </summary>
@@ -166,7 +235,7 @@ public sealed class Rotation
                 continue;
             }
 
-            return context.Cast(rule.SpellName, rule.OnSelf) ? rule : null;
+            return rule.Fire(context) ? rule : null;
         }
 
         return null;

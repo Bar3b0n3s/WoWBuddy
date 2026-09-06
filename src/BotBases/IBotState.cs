@@ -3,6 +3,7 @@ using WoWBuddy.Common.Geometry;
 using WoWBuddy.CombatRoutines;
 using WoWBuddy.BotBases.Support;
 using WoWBuddy.Common.Scheduling;
+using WoWBuddy.BotBases.Group;
 using WoWBuddy.BotBases.Questing;
 using WoWBuddy.Core.Objects;
 
@@ -182,4 +183,9 @@ public interface IBotState
     /// </summary>
     /// <returns>False when the item is not carried or is on cooldown.</returns>
     bool UseItem(uint itemId);
+
+    // ---- Added in phase 8 -------------------------------------------------------------
+
+    /// <summary>The character's group, and what it is doing.</summary>
+    IPartyState Party { get; }
 }

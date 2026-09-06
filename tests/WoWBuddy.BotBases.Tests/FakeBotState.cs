@@ -1,4 +1,5 @@
 using WoWBuddy.Behavior;
+using WoWBuddy.BotBases.Group;
 using WoWBuddy.BotBases.Questing;
 using WoWBuddy.BotBases;
 using WoWBuddy.BotBases.Support;
@@ -245,6 +246,11 @@ public sealed class FakeBotState : IBotState
         Actions.Add($"UseItem({itemId})");
         return ItemCount(itemId) > 0 && !UnusableItems.Contains(itemId);
     }
+
+    /// <summary>The character's group.</summary>
+    public FakeParty PartyState { get; } = new();
+
+    public IPartyState Party => PartyState;
 
     /// <summary>Places a creature or object the client can see.</summary>
     public VisibleObject AddVisible(ulong guid, uint entry, float distance = 10f, bool hasPosition = true)

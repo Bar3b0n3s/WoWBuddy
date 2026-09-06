@@ -47,27 +47,50 @@ public sealed class HolyPriest : RoutineBase
         .Cast("Shadow Word: Pain", description: "opener; it keeps ticking while other things happen")
         .Cast("Smite");
 
+    /// <summary>
+    /// Health below which somebody is worth an emergency cast rather than a steady one.
+    /// </summary>
+    private const double Emergency = 45d;
+
     /// <inheritdoc />
+    /// <remarks>
+    /// Healing above damage, and the group's health above the character's own position in the
+    /// list. Solo, the group is empty and every rule below reads exactly as it did before
+    /// groups existed: the character is the only member, so it heals itself.
+    /// </remarks>
     protected override Rotation CombatRotation { get; } = new Rotation()
-        // Survival first. Every rule below this line is a damage rule, and a healer that
-        // reaches them while dying has its priorities the wrong way round.
-        .Cast("Power Word: Shield",
-            c => c.Me.HealthPercent < 70d && !c.HasAura(c.Me, "Weakened Soul"),
-            onSelf: true,
+        // Emergencies first, on whoever is in one. A healer that finishes its cast bar while
+        // the tank dies has its priorities the wrong way round.
+        .CastOn("Flash Heal",
+            c => GroupHealing.MostHurt(c, Emergency),
+            description: "emergency heal on whoever is worst off")
+
+        .CastOn("Power Word: Shield",
+            c => GroupHealing.MostHurt(c, 70d) is { } hurt && !c.HasAura(hurt, "Weakened Soul")
+                ? hurt
+                : null,
             description: "absorbs before the damage lands, unlike a heal")
-        .Cast("Flash Heal",
-            c => c.Me.HealthPercent < 45d,
-            onSelf: true,
-            description: "emergency heal")
-        .Cast("Renew",
-            c => c.Me.HealthPercent < 80d && !c.HasAura(c.Me, "Renew"),
-            onSelf: true,
+
+        // Worth a group heal only when it saves more than one person; otherwise it is a slower,
+        // costlier single heal.
+        .Cast("Prayer of Healing",
+            c => GroupHealing.CountBelow(c, 65d) >= 3,
+            description: "three or more hurt makes it cheaper per point than healing each")
+
+        .CastOn("Renew",
+            c => GroupHealing.MostHurt(c, 80d) is { } hurt && !c.HasAura(hurt, "Renew") ? hurt : null,
             description: "cheap and keeps working while casting something else")
+
+        .CastOn("Heal",
+            c => GroupHealing.MostHurt(c, 70d),
+            description: "the efficient heal when there is time for it")
+
+        // Every rule below this line is damage, reached only when nobody needs healing.
         .Cast("Shadow Word: Pain",
             c => c.Target is not null && !c.HasAura(c.Target, "Shadow Word: Pain"),
             description: "kept up rather than recast")
-        .Cast("Holy Fire")
-        .Cast("Smite", description: "filler");
+        .Cast("Holy Fire", c => c.Target is not null)
+        .Cast("Smite", c => c.Target is not null, description: "filler");
 
     /// <inheritdoc />
     protected override Rotation RestRotation { get; } = new Rotation()

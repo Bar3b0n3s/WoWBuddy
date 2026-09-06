@@ -1,5 +1,6 @@
 using WoWBuddy.Behavior;
 using WoWBuddy.Common.Geometry;
+using WoWBuddy.BotBases.Group;
 using WoWBuddy.BotBases.Support;
 using WoWBuddy.Common.Logging;
 using WoWBuddy.Common.Scheduling;
@@ -55,6 +56,7 @@ public static class RootTree
 
                 HandleDeath(),
                 HandleCombat(),
+                HandleGroupSupport(),
 
                 // A break means stop playing, not stop existing. It sits below death and
                 // combat deliberately: a character that spends a ten-minute break lying dead
@@ -87,6 +89,34 @@ public static class RootTree
                 Name = "Root",
             });
     }
+
+
+    /// <summary>
+    /// Letting the routine act while the group fights and the character has not been drawn in.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A healer stood behind the tank is not in combat and has nothing targeted, so
+    /// <see cref="HandleCombat"/> passes it over entirely — and the tank dies while the bot
+    /// considers what to do next. This branch exists for exactly that gap.
+    /// </para>
+    /// <para>
+    /// <b>It reports failure even when the routine acted.</b> That is deliberate rather than a
+    /// mistake: returning success or running here would swallow the tick, and a damage
+    /// character would then never reach the bot base that picks it a target to assist with.
+    /// Failing lets the routine take its chance to heal and the rest of the tree carry on.
+    /// </para>
+    /// </remarks>
+    public static Node<IBotState> HandleGroupSupport() =>
+        new If<IBotState>(
+            s => !s.IsInCombat && s.Target is not { IsAlive: true } && s.Party.AnyoneInCombat(),
+            new Do<IBotState>(s =>
+            {
+                s.Routine.Combat(s.Combat);
+                return RunStatus.Failure;
+            })
+            { Name = "Support the group" })
+        { Name = "Group is fighting" };
 
     /// <summary>
     /// Emptying corpses the character has killed.
@@ -248,7 +278,11 @@ public static class RootTree
     /// </remarks>
     public static Node<IBotState> HandleRest() =>
         new If<IBotState>(
-            s => !s.IsInCombat && !s.Routine.IsReadyToFight(s.Combat),
+            // Not while anyone in the group is fighting. Sitting down to drink as the tank
+            // pulls is the group-play equivalent of resting mid-fight, and the character's own
+            // combat flag does not catch it: a healer stood behind the tank is not yet in
+            // combat when the pull happens.
+            s => !s.IsInCombat && !s.Party.AnyoneInCombat() && !s.Routine.IsReadyToFight(s.Combat),
             new Sequence<IBotState>(
                 new Do<IBotState>(s =>
                 {

@@ -112,7 +112,8 @@ public sealed class FakeCombat : ICombatContext
             return PetAuras.Contains(auraName);
         }
 
-        return false;
+        return GroupAuras.TryGetValue(unit.Guid.Value, out HashSet<string>? auras)
+            && auras.Contains(auraName);
     }
 
     /// <inheritdoc />
@@ -125,5 +126,59 @@ public sealed class FakeCombat : ICombatContext
 
         CastLog.Add(spellName);
         return true;
+    }
+
+    // ---- group play -----------------------------------------------------------------------
+
+    /// <summary>The rest of the group.</summary>
+    public List<UnitSnapshot> Party { get; } = [];
+
+    /// <inheritdoc />
+    public IReadOnlyList<UnitSnapshot> Group => Party;
+
+    /// <summary>Auras on group members, by GUID.</summary>
+    public Dictionary<ulong, HashSet<string>> GroupAuras { get; } = [];
+
+    /// <summary>Who each cast was aimed at, in order, alongside <see cref="CastLog"/>.</summary>
+    public List<(string Spell, WoWGuid Unit)> CastOnLog { get; } = [];
+
+    /// <inheritdoc />
+    public bool CastOn(string spellName, UnitSnapshot unit)
+    {
+        if (Refused.Contains(spellName))
+        {
+            return false;
+        }
+
+        CastLog.Add(spellName);
+        CastOnLog.Add((spellName, unit.Guid));
+        return true;
+    }
+
+    /// <summary>Adds someone to the group.</summary>
+    public UnitSnapshot WithGroupMember(
+        ulong guid,
+        double healthPercent = 100d,
+        bool alive = true,
+        float distance = 10f)
+    {
+        var member = new UnitSnapshot(
+            new WoWGuid(guid), healthPercent, 100d, 0, 80, alive, distance, WoWGuid.Zero);
+
+        Party.Add(member);
+        return member;
+    }
+
+    /// <summary>Puts an aura on a group member.</summary>
+    public FakeCombat WithGroupAura(UnitSnapshot member, string aura)
+    {
+        if (!GroupAuras.TryGetValue(member.Guid.Value, out HashSet<string>? auras))
+        {
+            auras = [];
+            GroupAuras[member.Guid.Value] = auras;
+        }
+
+        auras.Add(aura);
+        return this;
     }
 }

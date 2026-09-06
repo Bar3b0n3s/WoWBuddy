@@ -68,6 +68,7 @@ covers confirming click-to-move before anything writes to it,
 scheduler. [docs/world-data.md](docs/world-data.md) covers how the bot learns where things are, and
 [docs/profiles.md](docs/profiles.md) covers the profile format the questing base reads,
 with [docs/phase-7-manual-test.md](docs/phase-7-manual-test.md) for questing.
+[docs/group-play.md](docs/group-play.md) covers parties, following, assisting and healing.
 
 ## How this project handles low-level facts
 
