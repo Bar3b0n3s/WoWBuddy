@@ -11,6 +11,7 @@ using WoWBuddy.GameApi;
 using WoWBuddy.GameApi.Objects;
 using WoWBuddy.Navigation;
 using WoWBuddy.Navigation.Data;
+using WoWBuddy.WorldData;
 
 namespace WoWBuddy.Inspector;
 
@@ -53,6 +54,7 @@ public static class Program
                 "lua" => LuaConsole(args),
                 "ctm" => ReadClickToMove(args),
                 "nav" => CheckNavigationData(args),
+                "worlddata" => CheckWorldData(args),
                 "help" or "--help" or "-h" => ShowHelp(),
                 _ => ShowUnknownCommand(command),
             };
@@ -88,6 +90,9 @@ public static class Program
             Navigation data (phase 3). Needs no client:
               nav <mmaps-dir> [mapId...]
                                 Check navigation data you extracted yourself.
+              worlddata <dir> [--find TEXT]
+                                Check world data exported from your server database,
+                                and search it for node types by name.
 
               help              Show this text.
 
@@ -445,6 +450,78 @@ public static class Program
         Console.WriteLine($"{usable} of {maps.Length} map(s) usable.");
         Console.WriteLine("See docs/navigation-data.md if anything above failed.");
         return usable > 0 ? 0 : 1;
+    }
+
+    /// <summary>
+    /// Checks a world data export and searches it for node types.
+    /// </summary>
+    /// <remarks>
+    /// Needs no game client. The search is how a user finds the node entry ids to gather:
+    /// the bot ships no list, because inventing one would be an unverified fact and the ids
+    /// differ between databases anyway.
+    /// </remarks>
+    private static int CheckWorldData(string[] args)
+    {
+        if (args.Length < 2)
+        {
+            Console.Error.WriteLine("Usage: worlddata <export-directory> [--find TEXT]");
+            Console.Error.WriteLine("See docs/world-data.md for how to produce the export.");
+            return 2;
+        }
+
+        string directory = args[1];
+        if (!Directory.Exists(directory))
+        {
+            Console.Error.WriteLine($"No such directory: {directory}");
+            return 1;
+        }
+
+        var set = new WorldDataSet();
+        IReadOnlyList<string> problems = set.LoadFrom(directory);
+
+        Console.WriteLine($"World data in {directory}");
+        Console.WriteLine();
+        Console.WriteLine($"  Game object spawns    {set.GameObjectSpawnCount,9}");
+        Console.WriteLine($"  Game object templates {set.GameObjectTemplateCount,9}");
+        Console.WriteLine($"  Creature spawns       {set.CreatureSpawnCount,9}");
+        Console.WriteLine($"  Service creatures     {set.CreatureTemplateCount,9}");
+
+        if (problems.Count > 0)
+        {
+            Console.WriteLine();
+            foreach (string problem in problems)
+            {
+                Console.WriteLine($"  {problem}");
+            }
+        }
+
+        int findIndex = Array.FindIndex(args, a => a == "--find");
+        if (findIndex >= 0 && findIndex + 1 < args.Length)
+        {
+            string text = args[findIndex + 1];
+            Console.WriteLine();
+            Console.WriteLine($"Gatherable objects matching \"{text}\":");
+
+            IReadOnlyList<GameObjectTemplate> found = set.FindTemplatesByName(text);
+            if (found.Count == 0)
+            {
+                Console.WriteLine("  Nothing matched. Names come from your database, so try its language.");
+            }
+
+            foreach (GameObjectTemplate template in found.Take(40))
+            {
+                Console.WriteLine($"  {template.Entry,8}  {template.Name}");
+            }
+
+            if (found.Count > 40)
+            {
+                Console.WriteLine($"  ... and {found.Count - 40} more");
+            }
+        }
+
+        Console.WriteLine();
+        Console.WriteLine("See docs/world-data.md if anything above is missing.");
+        return set.IsLoaded ? 0 : 1;
     }
 
     private static string MapName(int mapId) => mapId switch

@@ -1,13 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0-windows</TargetFramework>
-    <RootNamespace>WoWBuddy.BotBases.Tests</RootNamespace>
-    <AssemblyName>WoWBuddy.BotBases.Tests</AssemblyName>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>WoWBuddy.WorldData.Tests</RootNamespace>
+    <AssemblyName>WoWBuddy.WorldData.Tests</AssemblyName>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\BotBases\WoWBuddy.BotBases.csproj" />
     <ProjectReference Include="..\..\src\WorldData\WoWBuddy.WorldData.csproj" />
   </ItemGroup>
   <ItemGroup>

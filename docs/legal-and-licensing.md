@@ -74,12 +74,13 @@ their output or talks to them over a socket.
 | Tool | Licence | Role |
 | --- | --- | --- |
 | TrinityCore / AzerothCore map extractors | GPL-2.0 | The user runs these against **their own** game client to produce `maps`, `vmaps` and `mmaps` navigation data. |
-| AzerothCore / TrinityCore server | GPL-2.0 | Used as an integration-test target, and as the reference for protocol facts such as descriptor field indices. |
+| AzerothCore / TrinityCore server | GPL-2.0 | Used as an integration-test target; as the reference for protocol facts such as descriptor field indices; and as the source of the world data (node and NPC locations) the user exports from their own installation. See [world-data.md](world-data.md). |
 
 ## What is never in this repository
 
 - Blizzard game files, art, models, maps, DBC data, or MPQ archives.
 - Extracted navigation data. Users generate it from their own client.
+- World data exported from a server database. Users export it from their own installation.
 - Any account credential. The optional auto-login feature stores credentials encrypted with
   Windows DPAPI, in the user's profile, never in the repository.
 

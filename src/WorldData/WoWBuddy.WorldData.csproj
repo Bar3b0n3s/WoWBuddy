@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>WoWBuddy.WorldData</RootNamespace>
+    <AssemblyName>WoWBuddy.WorldData</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Common\WoWBuddy.Common.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Serilog" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="WoWBuddy.WorldData.Tests" />
+  </ItemGroup>
+</Project>

@@ -19,8 +19,9 @@ The delivery plan runs to eleven phases. Three are done.
 | 3 — Move: navigation meshes, path following, stuck handling | **Done** |
 | 4 — Fight: behaviour trees, four combat routines, grind bot base | **Done** |
 | 5 — Live: loot, gear, errand planning, scheduler, humanization | **Done** |
-| 6 — Gather and Fish bot bases | Next |
-| 7-11 — Questing, dungeons, professions, plugins, release | Not started |
+| 6 — Gather and Fish bases, world data from your server database | **Done** |
+| 7 — Questing base, profile schema and importer | Next |
+| 8-11 — Dungeons, battlegrounds, professions, plugins, release | Not started |
 
 **What works today.** Find a running 12340 client, attach, verify the offset table against
 that specific client, and walk the object manager to read the local player and everything
@@ -64,7 +65,8 @@ covers extracting navigation data and [docs/phase-3-manual-test.md](docs/phase-3
 covers confirming click-to-move before anything writes to it,
 [docs/phase-4-manual-test.md](docs/phase-4-manual-test.md) covers combat, and
 [docs/phase-5-manual-test.md](docs/phase-5-manual-test.md) covers looting, gear and the
-scheduler.
+scheduler. [docs/world-data.md](docs/world-data.md) covers exporting node and NPC locations
+from your TrinityCore or AzerothCore database.
 
 ## How this project handles low-level facts
 
@@ -109,6 +111,7 @@ src/Core         Offsets, memory, process attach, object manager, verification,
                  game-thread execution (x86 codegen, EndScene hook, Lua bridge)
 src/GameApi      Typed model: WoWUnit, WoWPlayer, WoWGameObject
 src/Navigation   Navigation mesh loading, pathfinding, movement, stuck handling
+src/WorldData    Node and NPC locations exported from your own server database
 src/Behavior     Behaviour tree engine
 src/CombatRoutines  Rotation engine and per-specialisation routines
 src/BotBases     Root behaviour tree and the grind base
