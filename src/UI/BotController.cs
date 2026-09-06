@@ -484,7 +484,14 @@ public sealed class BotController(
             new LuaTravel(lua, _capabilities!, () => view.IsMounted, _settings.MountName),
             new SessionScheduler(new SessionSchedule()),
             routine,
-            new LiveCombatContext(lua, view, _caster));
+            new LiveCombatContext(lua, view, _caster),
+            clock: null,
+
+            // Listening for whispers is not optional in the way the other readers are: an
+            // unattended session that plays through a game master's question is the failure
+            // this whole project is most exposed to. What it does about one is a setting.
+            new LuaWhispers(lua, _capabilities!),
+            new WhisperWatch(_settings.ResolveWhispers()));
     }
 
     /// <summary>

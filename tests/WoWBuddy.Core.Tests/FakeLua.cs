@@ -115,7 +115,7 @@ public sealed class FakeLua : ILuaEvaluator
             "GetNumTrainerServices", "GetTrainerServiceInfo", "GetTrainerServiceCost",
             "BuyTrainerService", "SetTrainerServiceTypeFilter", "CloseTrainer",
             "GetUnspentTalentPoints", "GetTalentInfo", "LearnTalent",
-            "IsUsableSpell", "CastSpellByName", "Dismount", "GetRealmName");
+            "IsUsableSpell", "CastSpellByName", "Dismount", "GetRealmName", "CreateFrame");
 
         return lua;
     }

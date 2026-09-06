@@ -21,6 +21,13 @@ zero, anything may change.
   `Objective` step that names no creature works from the quest's own requirements instead of
   killing whatever is nearest, and a `Collect` step can be finished by the bags without reading
   log text in a language the bot cannot parse. What the profile says always wins.
+- **The bot stops when a person speaks to it.** A small frame inside the client listens for
+  whispers and the bot drains it every tick, standing the character still for ten minutes by
+  default — or stopping for good, or doing nothing, as you choose — with an ignore list so a
+  guild's ordinary chatter does not end every session. It never replies: a bot that says "hi" to
+  a game master has still shown exactly what it is. This is the failure an unattended session
+  can least afford, and it was the last thing on the list that could ruin an account rather than
+  an evening.
 - **Learning abilities from a trainer.** `ITrainerActions` and `LuaTrainer` read what a trainer
   will teach — filtered to what is actually available, so an index cannot point at something the
   character already knows — and learn it. No spell data ships: the trainer already knows what

@@ -51,6 +51,8 @@ public sealed class LiveBotState : IBotState, IProfileConditionContext
     private readonly LuaInventory _inventory;
     private readonly LuaVendor _vendor;
     private readonly LuaTrainer _trainer;
+    private readonly LuaWhispers? _whispers;
+    private readonly WhisperWatch? _watch;
     private readonly LuaTalents _talents;
     private readonly LuaTravel _travel;
     private readonly SessionScheduler _session;
@@ -75,7 +77,9 @@ public sealed class LiveBotState : IBotState, IProfileConditionContext
         SessionScheduler session,
         ICombatRoutine routine,
         ICombatContext combat,
-        Func<DateTimeOffset>? clock = null)
+        Func<DateTimeOffset>? clock = null,
+        LuaWhispers? whispers = null,
+        WhisperWatch? watch = null)
     {
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
         Now = _clock();
@@ -89,6 +93,11 @@ public sealed class LiveBotState : IBotState, IProfileConditionContext
         _inventory = inventory ?? throw new ArgumentNullException(nameof(inventory));
         _vendor = vendor ?? throw new ArgumentNullException(nameof(vendor));
         _trainer = trainer ?? throw new ArgumentNullException(nameof(trainer));
+
+        // Both or neither. A listener with nothing to decide would drain the client's buffer
+        // and throw the whispers away, which is worse than not listening at all.
+        _whispers = watch is null ? null : whispers;
+        _watch = whispers is null ? null : watch;
         _talents = talents ?? throw new ArgumentNullException(nameof(talents));
         _travel = travel ?? throw new ArgumentNullException(nameof(travel));
         _session = session ?? throw new ArgumentNullException(nameof(session));
@@ -381,7 +390,24 @@ public sealed class LiveBotState : IBotState, IProfileConditionContext
     }
 
     /// <summary>Updates the session clock, and reports whether the bot should still be playing.</summary>
-    public SessionState UpdateSession(DateTimeOffset now) => _session.Update(now, Level);
+    /// <remarks>
+    /// Whispers are considered first, so that someone speaking to the character takes effect on
+    /// this tick rather than the next one. A tick is a quarter of a second, which does not
+    /// matter much — but the ordering is the difference between "stopped when spoken to" and
+    /// "took one more swing first", and only one of those is worth writing down.
+    /// </remarks>
+    public SessionState UpdateSession(DateTimeOffset now)
+    {
+        if (_whispers is not null && _watch is not null)
+        {
+            _watch.Consider(_whispers, _session, now);
+        }
+
+        return _session.Update(now, Level);
+    }
+
+    /// <summary>What has been said to the character, for the window.</summary>
+    public WhisperWatch? Whispers => _watch;
 
     /// <summary>Throws away every cached reading, for when the world has changed underneath.</summary>
     /// <remarks>

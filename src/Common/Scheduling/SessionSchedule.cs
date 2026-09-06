@@ -76,4 +76,7 @@ public enum StopReason
 
     /// <summary>Something asked the scheduler to stop.</summary>
     Requested,
+
+    /// <summary>Someone whispered the character.</summary>
+    Whispered,
 }

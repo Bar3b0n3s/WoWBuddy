@@ -152,6 +152,14 @@ public static class CapabilityProbes
             "getting on and off a mount",
             "The character walks everywhere, which is slower and never wrong."),
 
+        // The only reader that cannot poll: a whisper is an event, and by the time the bot
+        // next asks, it has been and gone. So a frame inside the client listens for it.
+        new(GameCapability.Whispers,
+            ["CreateFrame"],
+            "noticing that a person has spoken to the character",
+            "The bot plays straight through a whisper, which is the thing an unattended "
+            + "session can least afford to do."),
+
         // Only ever used to name a file. It earns a probe anyway, because every Lua call this
         // project makes is listed here and a call that quietly is not would be the exception
         // nobody remembers.

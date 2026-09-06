@@ -120,6 +120,38 @@ public sealed class SessionScheduler
         Log.For<SessionScheduler>().Information("Session stopped: {Reason}", reason);
     }
 
+    /// <summary>
+    /// Stands the character still until a given moment.
+    /// </summary>
+    /// <remarks>
+    /// A break the schedule did not plan, for something that happened: someone spoke to the
+    /// character, most obviously. It reuses the break state rather than adding a third one,
+    /// because the root tree already knows what to do on a break and the character standing
+    /// still is the same behaviour either way.
+    /// </remarks>
+    /// <param name="until">When to carry on. Earlier than the current break end is ignored.</param>
+    /// <param name="reason">Why, for the log.</param>
+    public void Pause(DateTimeOffset until, StopReason reason = StopReason.Requested)
+    {
+        if (State == SessionState.Stopped)
+        {
+            return;
+        }
+
+        // Never shortens a break already running. A second interruption during one should
+        // extend the quiet, not cut it short.
+        if (State == SessionState.OnBreak && until <= _breakEndsAt)
+        {
+            return;
+        }
+
+        _breakEndsAt = until;
+        State = SessionState.OnBreak;
+
+        Log.For<SessionScheduler>().Information(
+            "Standing still until {Until:HH:mm} ({Reason})", until, reason);
+    }
+
     /// <summary>Starts a fresh session, clearing elapsed time and break counts.</summary>
     public void Reset()
     {

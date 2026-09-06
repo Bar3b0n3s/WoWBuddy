@@ -65,6 +65,9 @@ public enum GameCapability
 
     /// <summary>Which server the character is on.</summary>
     Realm,
+
+    /// <summary>Noticing that a person has spoken to the character.</summary>
+    Whispers,
 }
 
 /// <summary>One thing to ask the client about itself.</summary>

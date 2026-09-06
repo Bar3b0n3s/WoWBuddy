@@ -126,7 +126,8 @@ public sealed class EndToEndTests
     private static Rig Build(
         Node<IBotState>? botBase = null,
         IReadOnlyList<ProfileVendor>? errands = null,
-        SessionSchedule? schedule = null)
+        SessionSchedule? schedule = null,
+        WhisperSettings? whispers = null)
     {
         FakeLua lua = FakeLua.Typical335a();
         CapabilityReport capabilities = CapabilityProbes.Probe(lua);
@@ -152,7 +153,9 @@ public sealed class EndToEndTests
             new SessionScheduler(schedule ?? new SessionSchedule()),
             routine,
             new StubCombat(),
-            () => Now);
+            () => Now,
+            new LuaWhispers(lua, capabilities, () => Now),
+            new WhisperWatch(whispers ?? new WhisperSettings()));
 
         Counter counter = new();
 
@@ -302,6 +305,39 @@ public sealed class EndToEndTests
     }
 
     [Fact]
+    public void BeingWhisperedStopsTheCharacterPlaying()
+    {
+        // The failure an unattended session can least afford: carrying on killing boars while a
+        // game master asks a question. Checked from here because it crosses four components —
+        // the client's own event handler, the drain, the watch, and the scheduler.
+        Rig rig = Build();
+
+        rig.Lua.Answers["__wowbuddy_result"] = "Gamemaster\u001Fplease respond\u001E";
+
+        Assert.Equal(TickOutcome.Ran, rig.Runner.Tick(Now));
+
+        Assert.Equal(SessionState.OnBreak, rig.State.Session);
+        Assert.Equal("Gamemaster", rig.State.Whispers?.Acted?.From);
+        Assert.Equal(0, rig.BotBase.Ticks);
+    }
+
+    [Fact]
+    public void AWhisperFromSomeoneOnTheIgnoreListChangesNothing()
+    {
+        Rig rig = Build(whispers: new WhisperSettings
+        {
+            Ignore = new HashSet<string>(["Myalt"], StringComparer.OrdinalIgnoreCase),
+        });
+
+        rig.Lua.Answers["__wowbuddy_result"] = "Myalt\u001Fhello\u001E";
+
+        rig.Runner.Tick(Now);
+
+        Assert.Equal(SessionState.Running, rig.State.Session);
+        Assert.Equal(1, rig.BotBase.Ticks);
+    }
+
+    [Fact]
     public void StoppingLeavesTheCharacterWhereItStands()
     {
         Rig rig = Build();
@@ -338,11 +374,23 @@ public sealed class EndToEndTests
         lua.Answers[LuaInventory.SellableScript] = "true";
         lua.Answers["__wowbuddy_result"] = inventory;
 
-        lua.OnExecute = script =>
-            lua.Answers["__wowbuddy_result"] =
-                script.Contains("GetContainerItemLink(bag, slot)", StringComparison.Ordinal)
+        lua.OnExecute = script => lua.Answers["__wowbuddy_result"] = Answer(script);
+
+        static string Answer(string script)
+        {
+            // The whisper drain empties its own buffer into the result, so an unanswered one
+            // would leave whatever the last reader put there — and the whisper reader would
+            // parse the inventory summary as somebody talking. That is a fidelity bug in the
+            // fake rather than in the bot, and it is exactly what this routing prevents.
+            if (script.Contains("__wowbuddy_result = __wowbuddy_whispers", StringComparison.Ordinal))
+            {
+                return string.Empty;
+            }
+
+            return script.Contains("GetContainerItemLink(bag, slot)", StringComparison.Ordinal)
                 && script.Contains("GetItemInfo(link)", StringComparison.Ordinal)
                     ? bags
                     : inventory;
+        }
     }
 }

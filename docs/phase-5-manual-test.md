@@ -115,6 +115,25 @@ Needs a world data export. Level the character past the training interval and:
 
 A trainer that teaches nothing the character can afford is a finished errand, not a failed one.
 
+## 5b. Whispers
+
+The one thing an unattended session can least afford to get wrong. With the bot running, have
+another character whisper it.
+
+1. **Expect the character to stop where it is**, within a tick or so. The log names who spoke,
+   and only the log's debug level records what they said.
+2. **Expect it never to reply.** Answering automatically would be worse than silence: a bot that
+   says "hi" to a game master has still shown exactly what it is.
+3. **Expect it to carry on by itself** once the pause is up. A pause that needed clearing by
+   hand would be a stop under another name.
+4. Put a name on the ignore list and whisper from it. **Expect nothing to happen**, and the
+   whisper still to appear in the log.
+5. Reload the interface (`/console reloadui`) and whisper again. **Expect it still to work** —
+   the listener is rebuilt on every drain precisely because a reload destroys it.
+
+If it does not react at all, check the capability report for `Whispers`: without `CreateFrame`
+the bot cannot listen, and it says so at attach rather than pretending.
+
 ## 6. The scheduler
 
 Set a short work interval and break length to watch it without waiting ninety minutes.
@@ -148,5 +167,4 @@ necks and cloaks are exempt because the client reports no meaningful subclass fo
 | Buying food and water | The bot buys crafting materials but does not stock up on consumables; resting works with what is already in the bags. |
 | Bind-on-pickup filtering | `GetItemInfo` does not report it on this client; tooltip scanning would be language-dependent. |
 | Talent assignment without a build | This project has no talent data. Points are spent only against a build you write; see the talents setting. |
-| Whisper alerts and pause-on-whisper | Needs chat event plumbing that no other part of the bot uses yet. |
 | Riding skill and mount purchase | The bot uses a mount you already own; buying one means a mount vendor's window, which is not read. |

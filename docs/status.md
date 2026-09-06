@@ -31,6 +31,10 @@ loader and a Honorbuddy importer; loot rules, gear evaluation and errand plannin
 scheduler with randomised breaks; group play — following, assisting, role-aware behaviour,
 group healing; plugins.
 
+**Noticing when it is spoken to.** A frame inside the client listens for whispers; the bot
+drains it every tick and stands the character still — or stops for good, if you would rather.
+It never replies.
+
 **Keeping what it learns.** Every vendor, mailbox and node the character walks past is written
 down and read back next session, one map per realm and character.
 
@@ -89,6 +93,7 @@ The window asks, keeps the answer, and never guesses:
 | Mesh folder | Extracting them puts them wherever the extractor ran; copying gigabytes next to the bot is a poor default |
 | Talent build | This project has no talent data. Unspent points cost nothing; wrongly spent ones cost gold to undo |
 | Mount name | Which mounts a character owns is in its spellbook, but which is fastest or usable here needs spell data this project does not ship |
+| Whisper ignore list | Nobody but you knows which of your guildmates already know what the character is doing |
 
 Settings live beside the executable and hold nothing that could log a character in. This project
 makes no network calls, and storing an account password to be typed into a game client is a
