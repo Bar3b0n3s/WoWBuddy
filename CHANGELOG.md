@@ -31,6 +31,13 @@ zero, anything may change.
 
 ### Added
 
+- **Exact hostility, from the client's own faction data.** A DBC reader and
+  `FactionTemplate.dbc` replace the approximation entirely. Extract it into a `dbc` folder; the
+  log says which is in use.
+- **The Train errand works.** The creature export now carries trainer type and class, which the
+  trainer flag alone does not distinguish.
+- **Vendor inventories and quest objectives** are in the export, ready for buying materials and
+  for the questing base to know what a quest actually asks for.
 - **The bot can tell an elite from an ordinary mob.** The world data export now carries
   `creature_template`'s rank, faction and level range, and the grind base leaves elites, bosses
   and anything far above the character alone. Rank is not in a unit's descriptors, so without

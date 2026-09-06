@@ -134,6 +134,33 @@ Without the export the bot still runs — the target filter rejects nothing it c
 because refusing everything unknown would stop a bot that had been working perfectly well. It
 just plays worse, and the status line says so.
 
+## Faction data comes from the client, not the database
+
+Hostility is the one thing the database cannot answer. `creature_template.faction` gives a
+faction *template id*; what that template attacks lives in `FactionTemplate.dbc`, which is
+client data.
+
+Extract it with the same tool that produces the navigation meshes and put it in a `dbc` folder
+beside WoWBuddy. With it, hostility is exact — both faction template ids come straight from the
+units' own descriptors, so no database is involved at all. Without it, the bot falls back to an
+approximation that excludes players and anything wearing NPC flags, and will occasionally offer
+a neutral critter as a target. The log says which of the two is in use at start-up.
+
+The reader refuses a file whose column count is not the 3.3.5a one, because reading the wrong
+columns would produce a hostility table that looks entirely reasonable and is wrong.
+
+## What else the tables carry
+
+| Export | What it unlocks |
+| --- | --- |
+| `creature-templates.tsv` | elites and bosses, level ranges, and which trainer teaches which class |
+| `item-templates.tsv` | loot decisions about an item before it is picked up |
+| `npc-vendors.tsv` | who sells a given item, for buying crafting materials |
+| `quest-templates.tsv` | what a quest actually asks for, rather than log text in the client's language |
+
+The Train errand needs the trainer columns: the trainer flag alone is on profession trainers,
+mount vendors and pet trainers too, and none of them teaches a warrior how to hit things.
+
 ## Public dumps, for users without a server
 
 The export scripts run against any TrinityCore or AzerothCore world database, including one

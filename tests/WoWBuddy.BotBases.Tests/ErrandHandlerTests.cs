@@ -204,11 +204,36 @@ public sealed class ErrandHandlerTests
     }
 
     [Fact]
-    public void TrainingIsReportedAsUnsupportedRatherThanApproximated()
+    public void TrainingIsReportedAsUnsupportedWithoutWorldData()
     {
-        // A trainer for the character's own class is something a profile cannot express and
-        // this project has no data for.
+        // A profile cannot say where a warrior trainer stands, and the trainer flag alone does
+        // not distinguish one from a profession trainer or a mount vendor.
         Assert.Null(new ErrandHandler(Settings()).Destination(Errand.Train, mapId: 0));
+    }
+
+    [Fact]
+    public void TrainingFindsAClassTrainerWhenWorldDataCanSupplyOne()
+    {
+        ProfileVendor trainer = new("Warrior Trainer", 913, 0, Town);
+
+        ErrandHandler handler = new(Settings() with
+        {
+            CharacterClass = 1,
+            FindTrainer = (map, _, characterClass) =>
+                map == 0 && characterClass == 1 ? trainer : null,
+        });
+
+        Assert.Equal(trainer, handler.Destination(Errand.Train, mapId: 0));
+
+        // And not somebody else's trainer.
+        ErrandHandler mage = new(Settings() with
+        {
+            CharacterClass = 8,
+            FindTrainer = (map, _, characterClass) =>
+                map == 0 && characterClass == 1 ? trainer : null,
+        });
+
+        Assert.Null(mage.Destination(Errand.Train, mapId: 0));
     }
 
     [Fact]

@@ -1,4 +1,5 @@
 using WoWBuddy.GameApi.Enums;
+using WoWBuddy.WorldData.Dbc;
 
 namespace WoWBuddy.Live;
 
@@ -20,6 +21,36 @@ namespace WoWBuddy.Live;
 /// </remarks>
 public static class HostilityRule
 {
+    /// <summary>
+    /// The real answer, when the client's own faction data has been extracted.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Both faction template ids come from the units' own descriptors, so this needs no server
+    /// database at all — only <c>FactionTemplate.dbc</c>, extracted from the user's client by
+    /// the same tool that produces the navigation meshes.
+    /// </para>
+    /// <para>
+    /// It still refuses to attack another player: that is a decision the grinding bases should
+    /// never make on their own, whatever the faction data says about it.
+    /// </para>
+    /// </remarks>
+    public static bool IsHostile(
+        FactionTemplates factions,
+        bool isPlayer,
+        uint theirFactionTemplate,
+        uint myFactionTemplate)
+    {
+        ArgumentNullException.ThrowIfNull(factions);
+
+        if (isPlayer)
+        {
+            return false;
+        }
+
+        return factions.IsHostile((int)theirFactionTemplate, (int)myFactionTemplate);
+    }
+
     /// <summary>True when a unit could be an enemy.</summary>
     /// <param name="isPlayer">Whether it is another player's character.</param>
     /// <param name="npcFlags">What services it offers, if any.</param>

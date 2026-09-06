@@ -159,10 +159,102 @@ public static class WorldDataReader
                 Optional(fields, 3, out uint faction) ? faction : 0,
                 OptionalInt(fields, 4),
                 OptionalInt(fields, 5),
-                OptionalInt(fields, 6)));
+                OptionalInt(fields, 6),
+                fields.Length > 7 ? OptionalInt(fields, 7) : -1,
+                OptionalInt(fields, 8)));
 
             return true;
         });
+    }
+
+    /// <summary>Reads what each vendor sells.</summary>
+    public static WorldDataReadResult ReadVendorItems(
+        TextReader reader, ICollection<VendorItem> into)
+    {
+        ArgumentNullException.ThrowIfNull(reader);
+        ArgumentNullException.ThrowIfNull(into);
+
+        return Read(reader, ["entry", "item"], fields =>
+        {
+            if (!TryUInt(fields[0], out uint vendor) || !TryUInt(fields[1], out uint item))
+            {
+                return false;
+            }
+
+            into.Add(new VendorItem(vendor, item));
+            return true;
+        });
+    }
+
+    /// <summary>Reads quest objectives.</summary>
+    /// <remarks>
+    /// Four creature slots and six item slots, which is what a 3.3.5 quest has. Empty slots are
+    /// zero and are dropped rather than kept as requirements for nothing.
+    /// </remarks>
+    public static WorldDataReadResult ReadQuestTemplates(
+        TextReader reader, ICollection<QuestTemplate> into)
+    {
+        ArgumentNullException.ThrowIfNull(reader);
+        ArgumentNullException.ThrowIfNull(into);
+
+        string[] columns =
+        [
+            "id", "title", "minlevel", "questlevel",
+            "npc1", "npccount1", "npc2", "npccount2", "npc3", "npccount3", "npc4", "npccount4",
+            "item1", "itemcount1", "item2", "itemcount2", "item3", "itemcount3",
+            "item4", "itemcount4", "item5", "itemcount5", "item6", "itemcount6",
+        ];
+
+        return Read(reader, columns, fields =>
+        {
+            if (!TryUInt(fields[0], out uint id) || id == 0)
+            {
+                return false;
+            }
+
+            List<QuestRequirement> requirements = [];
+
+            // Creatures first, at four columns in, then items at twelve. A negative creature
+            // entry means a game object, which the bot interacts with rather than kills; the
+            // sign is dropped because the entry is all it needs.
+            AddPairs(fields, 4, 4, isItem: false, requirements);
+            AddPairs(fields, 12, 6, isItem: true, requirements);
+
+            into.Add(new QuestTemplate(
+                id,
+                fields[1],
+                OptionalInt(fields, 2),
+                OptionalInt(fields, 3),
+                requirements));
+
+            return true;
+        });
+    }
+
+    private static void AddPairs(
+        string[] fields,
+        int start,
+        int count,
+        bool isItem,
+        List<QuestRequirement> into)
+    {
+        for (int slot = 0; slot < count; slot++)
+        {
+            int index = start + (slot * 2);
+
+            if (index + 1 >= fields.Length)
+            {
+                return;
+            }
+
+            int entry = Math.Abs(OptionalInt(fields, index));
+            int needed = OptionalInt(fields, index + 1);
+
+            if (entry != 0 && needed > 0)
+            {
+                into.Add(new QuestRequirement((uint)entry, needed, isItem));
+            }
+        }
     }
 
     /// <summary>Reads item templates.</summary>

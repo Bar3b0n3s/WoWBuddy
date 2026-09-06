@@ -6,6 +6,7 @@ using WoWBuddy.Core.Objects;
 using WoWBuddy.GameApi;
 using WoWBuddy.GameApi.Enums;
 using WoWBuddy.GameApi.Objects;
+using WoWBuddy.WorldData.Dbc;
 
 namespace WoWBuddy.Live;
 
@@ -285,6 +286,27 @@ public sealed class WorldCharacterView : ICharacterView
     /// <summary>Applies <see cref="HostilityRule"/> to a unit read from the client.</summary>
     private static bool CouldBeHostile(WoWUnit unit) =>
         HostilityRule.CouldBeHostile(unit is WoWPlayer, unit.NpcFlags, unit.Flags);
+
+    /// <summary>
+    /// Builds a hostility test from the client's own faction data.
+    /// </summary>
+    /// <remarks>
+    /// Both faction template ids come from the units' descriptors, so this needs no server
+    /// database — only <c>FactionTemplate.dbc</c>, extracted from the user's own client. Pass
+    /// the result as the view's <c>isHostile</c> and the approximation is not used at all.
+    /// </remarks>
+    public static Func<WoWUnit, bool> HostilityFrom(FactionTemplates factions, World world)
+    {
+        ArgumentNullException.ThrowIfNull(factions);
+        ArgumentNullException.ThrowIfNull(world);
+
+        return unit => world.Me is { } me
+            && HostilityRule.IsHostile(
+                factions,
+                unit is WoWPlayer,
+                unit.FactionTemplate,
+                me.FactionTemplate);
+    }
 
     private CandidateTarget Describe(WoWUnit unit)
     {

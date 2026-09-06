@@ -28,6 +28,19 @@ public sealed record ErrandHandlerSettings
     /// <remarks>Twelve in this expansion, and the client silently ignores the thirteenth.</remarks>
     public const int AttachmentsPerLetter = 12;
 
+    /// <summary>
+    /// Finds a trainer for the character's class, given a map, a position and a class id.
+    /// </summary>
+    /// <remarks>
+    /// Supplied from world data, because a profile has no way to say where a warrior trainer
+    /// stands and the trainer flag alone does not distinguish one from a profession trainer or
+    /// a mount vendor. Without it the Train errand reports that it cannot run.
+    /// </remarks>
+    public Func<int, Vector3, int, ProfileVendor?>? FindTrainer { get; init; }
+
+    /// <summary>The character's class, for finding the right trainer.</summary>
+    public int CharacterClass { get; init; }
+
     /// <summary>How long to wait for a window to open before giving up on the errand.</summary>
     /// <remarks>
     /// The character can be standing at the right spot and still not have a window: the vendor
@@ -61,6 +74,7 @@ public sealed class ErrandHandler
 
     private DateTimeOffset _waitingSince = DateTimeOffset.MinValue;
     private Errand _waitingFor = Errand.None;
+    private Vector3 _lastPosition;
 
     public ErrandHandler(ErrandHandlerSettings? settings = null, Func<DateTimeOffset>? clock = null)
     {
@@ -76,8 +90,11 @@ public sealed class ErrandHandler
         Errand.Sell => Nearest(mapId, vendor => !vendor.IsMailbox),
         Errand.Mail => Nearest(mapId, vendor => vendor.IsMailbox),
 
-        // Training needs a trainer for the character's own class, which a profile has no way to
-        // say and this project has no data for. Reported rather than approximated.
+        // A profile cannot say where a warrior trainer stands, so this comes from world data
+        // when there is any. Without it the errand is reported as impossible rather than
+        // approximated with the nearest thing wearing a trainer flag.
+        Errand.Train => _settings.FindTrainer?.Invoke(mapId, _lastPosition, _settings.CharacterClass),
+
         _ => null,
     };
 
@@ -88,6 +105,10 @@ public sealed class ErrandHandler
     private RunStatus Run(IBotState state)
     {
         Errand errand = state.CurrentErrand;
+
+        // Kept so Destination can be asked without a state, which is what makes it testable and
+        // what lets the window show where the bot would go before it sets off.
+        _lastPosition = state.Position;
 
         if (errand == Errand.None)
         {

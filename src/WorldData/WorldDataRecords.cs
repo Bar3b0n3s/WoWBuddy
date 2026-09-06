@@ -59,8 +59,22 @@ public readonly record struct CreatureTemplate(
     uint Faction = 0,
     int MinLevel = 0,
     int MaxLevel = 0,
-    int Rank = 0)
+    int Rank = 0,
+    int TrainerType = -1,
+    int TrainerClass = 0)
 {
+    /// <summary>Teaches a class its abilities.</summary>
+    public const int ClassTrainerType = 0;
+
+    /// <summary>Teaches mounts.</summary>
+    public const int MountTrainerType = 1;
+
+    /// <summary>Teaches professions.</summary>
+    public const int ProfessionTrainerType = 2;
+
+    /// <summary>Teaches pets.</summary>
+    public const int PetTrainerType = 3;
+
     /// <summary>Ordinary. Most things a grinding character kills.</summary>
     public const int NormalRank = 0;
 
@@ -122,6 +136,63 @@ public readonly record struct CreatureTemplate(
 
     /// <summary>True when the level range is known.</summary>
     public bool HasLevels => MinLevel > 0 && MaxLevel >= MinLevel;
+
+    /// <summary>
+    /// True when this trainer teaches the given class its own abilities.
+    /// </summary>
+    /// <remarks>
+    /// The Train errand needs a trainer for the character's class specifically. A profession
+    /// trainer, a mount vendor and a pet trainer all carry the trainer flag and none of them
+    /// teaches a warrior how to hit things.
+    /// </remarks>
+    public bool TrainsClass(int characterClass) =>
+        IsTrainer && TrainerType == ClassTrainerType && TrainerClass == characterClass;
+
+    /// <summary>True when this trainer teaches professions.</summary>
+    public bool TrainsProfessions => IsTrainer && TrainerType == ProfessionTrainerType;
+}
+
+/// <summary>Something a vendor sells.</summary>
+/// <param name="VendorEntry">The creature selling it.</param>
+/// <param name="ItemEntry">What it sells.</param>
+public readonly record struct VendorItem(uint VendorEntry, uint ItemEntry);
+
+/// <summary>One thing a quest asks for.</summary>
+/// <param name="Entry">The creature, object or item.</param>
+/// <param name="Count">How many.</param>
+/// <param name="IsItem">Whether it is an item to collect rather than something to kill.</param>
+public readonly record struct QuestRequirement(uint Entry, int Count, bool IsItem);
+
+/// <summary>
+/// What a quest actually wants.
+/// </summary>
+/// <remarks>
+/// The questing base can read the log and see whether an objective is finished, but not what it
+/// is for: the log gives text in the client's language. This says which creature to kill and
+/// how many, which is what turns "work the objective" into something the bot can act on.
+/// </remarks>
+/// <param name="Id">The quest id.</param>
+/// <param name="Title">Its name, for logs.</param>
+/// <param name="MinLevel">The level needed to take it.</param>
+/// <param name="QuestLevel">The level it is written for.</param>
+/// <param name="Requirements">What it asks for, kills and collections together.</param>
+public readonly record struct QuestTemplate(
+    uint Id,
+    string Title,
+    int MinLevel,
+    int QuestLevel,
+    IReadOnlyList<QuestRequirement> Requirements)
+{
+    /// <summary>Things to kill or interact with.</summary>
+    public IEnumerable<QuestRequirement> Kills =>
+        Requirements.Where(requirement => !requirement.IsItem);
+
+    /// <summary>Things to collect.</summary>
+    public IEnumerable<QuestRequirement> Collections =>
+        Requirements.Where(requirement => requirement.IsItem);
+
+    /// <summary>True when the quest asks for anything the bot could work towards.</summary>
+    public bool HasRequirements => Requirements.Count > 0;
 }
 
 /// <summary>

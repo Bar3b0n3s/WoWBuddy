@@ -17,6 +17,7 @@ using WoWBuddy.CombatRoutines;
 using WoWBuddy.Presentation;
 using WoWBuddy.Profiles;
 using WoWBuddy.WorldData;
+using WoWBuddy.WorldData.Dbc;
 
 namespace WoWBuddy.UI;
 
@@ -53,6 +54,7 @@ public sealed class BotController(BotSettings? settings = null) : IBotController
     private SpellCaster? _caster;
     private LuaTradeSkills? _tradeSkills;
     private WorldDataSet? _worldData;
+    private FactionTemplates? _factions;
     private int _ticking;
 
     /// <inheritdoc />
@@ -254,6 +256,15 @@ public sealed class BotController(BotSettings? settings = null) : IBotController
             {
                 Vendors = profile.Vendors,
                 MailRecipient = _settings.MailRecipient,
+                CharacterClass = (int)(_world?.Me?.Class ?? 0),
+
+                // World data knows where the class trainers are; a profile cannot.
+                FindTrainer = _worldData is { CreatureTemplateCount: > 0 }
+                    ? (map, near, characterClass) =>
+                        _worldData.FindClassTrainer(map, near, characterClass) is { } npc
+                            ? new ProfileVendor(npc.Name, npc.Spawn.Entry, npc.MapId, npc.Position)
+                            : null
+                    : null,
             })
             .Build();
         }
@@ -308,15 +319,50 @@ public sealed class BotController(BotSettings? settings = null) : IBotController
         return world;
     }
 
+    /// <summary>
+    /// Reads the faction relationships the user extracted from their own client.
+    /// </summary>
+    /// <remarks>
+    /// Absent is normal, and the bot falls back to the approximation with a line saying so.
+    /// Present, it stops offering neutral critters as targets.
+    /// </remarks>
+    private static FactionTemplates? LoadFactions()
+    {
+        string directory = Path.Combine(AppContext.BaseDirectory, "dbc");
+
+        if (FactionTemplates.TryReadFrom(directory, out FactionTemplates factions, out string error))
+        {
+            Log.For<BotController>().Information(
+                "Faction data loaded: {Count} templates. Hostility is exact.", factions.Count);
+
+            return factions;
+        }
+
+        Log.For<BotController>().Information(
+            "No faction data ({Reason}). Hostility falls back to an approximation that will "
+            + "occasionally offer a neutral creature as a target. Extract FactionTemplate.dbc "
+            + "into {Directory} to fix that.", error, directory);
+
+        return null;
+    }
+
     /// <summary>Builds the live picture of the client from the pieces that read it.</summary>
     private LiveBotState Compose(ExecutionSession execution, ICombatRoutine routine)
     {
         LuaBridge lua = execution.Lua;
 
+        // Faction data, when the user extracted it, replaces the hostility approximation
+        // outright. It comes from the client rather than the database: both faction template
+        // ids are in the units' own descriptors.
+        _factions ??= LoadFactions();
+
         WorldCharacterView view = new(
             _world!,
             new NativeFunctions(execution.Executor, _client!.Memory, _client.Objects),
             lua,
+            isHostile: _factions is { IsLoaded: true }
+                ? WorldCharacterView.HostilityFrom(_factions, _world!)
+                : null,
             canSkin: _settings.CanSkin);
 
         _movement = new MovementController(execution.ClickToMove);

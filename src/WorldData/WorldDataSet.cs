@@ -22,6 +22,8 @@ public sealed class WorldDataSet
     private readonly Dictionary<uint, GameObjectTemplate> _gameObjectTemplates = [];
     private readonly Dictionary<uint, CreatureTemplate> _creatureTemplates = [];
     private readonly Dictionary<uint, ItemTemplate> _itemTemplates = [];
+    private readonly Dictionary<uint, List<uint>> _vendorsByItem = [];
+    private readonly Dictionary<uint, QuestTemplate> _quests = [];
 
     /// <summary>Standard file names produced by the export scripts.</summary>
     public static class FileNames
@@ -36,6 +38,12 @@ public sealed class WorldDataSet
 
         /// <summary>Every item, for deciding about loot before picking it up.</summary>
         public const string ItemTemplates = "item-templates.tsv";
+
+        /// <summary>What each vendor sells, for buying materials.</summary>
+        public const string VendorItems = "npc-vendors.tsv";
+
+        /// <summary>What each quest asks for.</summary>
+        public const string QuestTemplates = "quest-templates.tsv";
     }
 
     /// <summary>Game object spawns, by map.</summary>
@@ -130,11 +138,44 @@ public sealed class WorldDataSet
             return result;
         });
 
+        LoadFile(directory, FileNames.VendorItems, problems, reader =>
+        {
+            var items = new List<VendorItem>();
+            WorldDataReadResult result = WorldDataReader.ReadVendorItems(reader, items);
+            foreach (VendorItem item in items)
+            {
+                // Indexed by what is sold rather than by who sells it: the question the bot
+                // asks is "who has this", never "what does that one have".
+                if (!_vendorsByItem.TryGetValue(item.ItemEntry, out List<uint>? sellers))
+                {
+                    sellers = [];
+                    _vendorsByItem[item.ItemEntry] = sellers;
+                }
+
+                sellers.Add(item.VendorEntry);
+            }
+
+            return result;
+        });
+
+        LoadFile(directory, FileNames.QuestTemplates, problems, reader =>
+        {
+            var quests = new List<QuestTemplate>();
+            WorldDataReadResult result = WorldDataReader.ReadQuestTemplates(reader, quests);
+            foreach (QuestTemplate quest in quests)
+            {
+                _quests[quest.Id] = quest;
+            }
+
+            return result;
+        });
+
         Log.For<WorldDataSet>().Information(
             "World data loaded: {GameObjects} object spawns, {Creatures} creature spawns, " +
-            "{ObjectTemplates} object templates, {CreatureTemplates} creatures, {Items} items",
+            "{ObjectTemplates} object templates, {CreatureTemplates} creatures, {Items} items, "
+            + "{Quests} quests",
             GameObjectSpawnCount, CreatureSpawnCount, GameObjectTemplateCount,
-            CreatureTemplateCount, ItemTemplateCount);
+            CreatureTemplateCount, ItemTemplateCount, QuestCount);
 
         return problems;
     }
@@ -145,6 +186,54 @@ public sealed class WorldDataSet
     /// <summary>What a creature is, if it was exported.</summary>
     public CreatureTemplate? CreatureFor(uint entry) =>
         _creatureTemplates.TryGetValue(entry, out CreatureTemplate template) ? template : null;
+
+    /// <summary>How many quests were exported.</summary>
+    public int QuestCount => _quests.Count;
+
+    /// <summary>What a quest asks for, if it was exported.</summary>
+    public QuestTemplate? QuestFor(uint id) =>
+        _quests.TryGetValue(id, out QuestTemplate quest) ? quest : null;
+
+    /// <summary>Creatures that sell an item.</summary>
+    public IReadOnlyList<uint> VendorsSelling(uint itemEntry) =>
+        _vendorsByItem.TryGetValue(itemEntry, out List<uint>? vendors) ? vendors : [];
+
+    /// <summary>
+    /// A trainer for a class, nearest to a position.
+    /// </summary>
+    /// <remarks>
+    /// The Train errand's whole problem: the trainer flag is on profession trainers, mount
+    /// vendors and pet trainers too, and none of those teaches a warrior how to hit things.
+    /// </remarks>
+    public ServiceNpc? FindClassTrainer(int mapId, Vector3 near, int characterClass)
+    {
+        ServiceNpc? best = null;
+        float bestDistance = float.MaxValue;
+
+        if (!_creaturesByMap.TryGetValue(mapId, out List<CreatureSpawn>? spawns))
+        {
+            return null;
+        }
+
+        foreach (CreatureSpawn spawn in spawns)
+        {
+            if (!_creatureTemplates.TryGetValue(spawn.Entry, out CreatureTemplate template)
+                || !template.TrainsClass(characterClass))
+            {
+                continue;
+            }
+
+            float distance = spawn.Position.Distance(near);
+
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                best = new ServiceNpc(spawn, template);
+            }
+        }
+
+        return best;
+    }
 
     /// <summary>What an item is, if it was exported.</summary>
     public ItemTemplate? ItemFor(uint entry) =>

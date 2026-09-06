@@ -79,41 +79,22 @@ Settings live beside the executable and hold nothing that could log a character 
 makes no network calls, and storing an account password to be typed into a game client is a
 promise it is not in a position to keep safely.
 
-### Hostility is guessed at
+### Hostility is exact with faction data, approximate without
 
-Faction is now in the export, so the raw material is there — but turning a faction template id
-into "hostile to me" needs `FactionTemplate.dbc`, which is client data rather than database
-data. Extracting it is the same job as extracting the navigation meshes, and reading it is not
-written yet.
+`FactionTemplate.dbc`, extracted from your own client into a `dbc` folder, makes hostility
+exact: both faction template ids come from the units' own descriptors, so no server database is
+involved. Without it the bot excludes players and anything wearing NPC flags and treats the rest
+as fair game, which will occasionally offer a neutral critter as a target. The log says which is
+in use.
 
-What the export does close is the more expensive half of the problem: elites, bosses and level
-ranges. Those were what actually killed unattended characters.
+### Nothing buys materials yet
 
-### The old hostility approximation
+The crafting base makes what the character is carrying and then stops. `npc-vendors.tsv` now
+says who sells what, so the data is there; the loop that walks to a vendor and buys is not
+written.
 
-Whether a creature is an enemy needs its faction template, and resolving one needs a data file
-this project does not ship. `HostilityRule` excludes players, anything wearing NPC flags, and
-unselectable or pacified units, then treats the rest as fair game. It will offer a neutral
-critter as a target. A profile's avoid list is the intended cover, and a user with faction data
-can supply a better rule.
-
-### Errands need a profile that names vendors, and cannot train
-
-`ErrandHandler` walks to a vendor, repairs, sells the junk the loot rules pick, and posts
-keepable items to another character. It needs somewhere to go, and vendor locations are game
-data, so **errands only run when the loaded profile has a `Vendors` section**. Without one the
-branch stays off — beginning an errand nothing can finish is worse than not starting one, and
-that is exactly what used to happen.
-
-**Training is not implemented.** It needs a trainer for the character's own class, which a
-profile has no way to express and this project has no data for. The planner can ask for it; the
-handler reports that it cannot and abandons the errand.
-
-### Nothing buys materials, and nothing visits a trainer
-
-The crafting base makes what the character is carrying and then stops. Working out what a recipe
-needs takes item data this project does not ship. Likewise the `Train` errand: it needs a
-trainer for the character's own class, which a profile cannot express.
+The `Train` errand does work when world data is exported — the creature table says which trainer
+teaches which class, which the trainer flag alone does not.
 
 ## Outstanding assumptions
 
