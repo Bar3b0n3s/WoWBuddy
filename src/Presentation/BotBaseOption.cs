@@ -27,5 +27,6 @@ public readonly record struct BotBaseOption(
         new("Questing", "Works through a profile's quests, then grinds.", NeedsProfile: true),
         new("Dungeon", "Follows, assists and plays its role in a group.", NeedsGroup: true),
         new("Battleground", "Queues, plays, and queues again.", NeedsProfile: true),
+        new("Craft", "Works through a profession's queue where it stands."),
     ];
 }

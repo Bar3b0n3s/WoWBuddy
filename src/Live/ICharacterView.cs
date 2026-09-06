@@ -56,6 +56,9 @@ public interface ICharacterView
     /// <summary>Corpses it killed that still hold loot.</summary>
     IReadOnlyList<CandidateTarget> LootableCorpses { get; }
 
+    /// <summary>Corpses it has looted that still hold a skin. Empty when it cannot skin.</summary>
+    IReadOnlyList<CandidateTarget> SkinnableCorpses { get; }
+
     /// <summary>Objects it can see: nodes, vendors, mailboxes, flags.</summary>
     IReadOnlyList<VisibleObject> VisibleObjects { get; }
 

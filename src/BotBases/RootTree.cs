@@ -85,6 +85,7 @@ public static class RootTree
                 // while the character is still hurt, and waiting until after a two-minute
                 // drink risks the corpse expiring.
                 HandleLooting(),
+                HandleSkinning(),
 
                 HandleRest(),
                 HandleErrands(errands, errandHandler),
@@ -300,6 +301,53 @@ public static class RootTree
                 new Do<IBotState>(_ => RunStatus.Failure) { Name = "Nothing to fight" })
             { Name = "Combat" })
         { Name = "Handle combat" };
+
+
+    /// <summary>How close the character has to be to skin something.</summary>
+    public const float SkinRange = 4f;
+
+    /// <summary>
+    /// Taking the skin off something already looted.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Below looting rather than beside it, because a corpse only becomes skinnable once its
+    /// loot has been taken: doing it the other way round means walking to the same corpse
+    /// twice.
+    /// </para>
+    /// <para>
+    /// Above resting, because a skin is on a timer and the character's health is not — the same
+    /// reasoning that puts looting there. Below combat, because nothing is worth being eaten
+    /// over.
+    /// </para>
+    /// </remarks>
+    public static Node<IBotState> HandleSkinning() =>
+        new If<IBotState>(
+            s => !s.IsInCombat && s.SkinnableCorpses.Count > 0,
+            new Do<IBotState>(s =>
+            {
+                CandidateTarget corpse = s.SkinnableCorpses[0];
+
+                if (corpse.Distance > SkinRange)
+                {
+                    if (s.MovementFailed)
+                    {
+                        // Under the world, on a ledge, the other side of a fence. Leaving it
+                        // is better than walking into the same rock until the corpse decays.
+                        return RunStatus.Failure;
+                    }
+
+                    return s.MoveTo(corpse.Position) ? RunStatus.Running : RunStatus.Failure;
+                }
+
+                s.StopMoving();
+
+                // Skinning is an interaction like any other: the client works out that the
+                // character has a knife and the corpse has a skin.
+                return s.Interact(corpse.Guid) ? RunStatus.Running : RunStatus.Failure;
+            })
+            { Name = "Skin a corpse" })
+        { Name = "Handle skinning" };
 
     /// <summary>
     /// Recovering out of combat, and keeping buffs up while it happens.

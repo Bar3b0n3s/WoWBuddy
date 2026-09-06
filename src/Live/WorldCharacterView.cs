@@ -40,6 +40,7 @@ public sealed class WorldCharacterView : ICharacterView
     private readonly NativeFunctions _natives;
     private readonly ILuaEvaluator _lua;
     private readonly Func<WoWUnit, bool> _isHostile;
+    private readonly bool _canSkin;
 
     /// <summary>Builds a view over an attached client.</summary>
     /// <param name="world">The typed object model.</param>
@@ -49,16 +50,23 @@ public sealed class WorldCharacterView : ICharacterView
     /// Decides whether a unit is worth attacking. Injected so that a user who has faction data
     /// can supply something better than the approximation described on this class.
     /// </param>
+    /// <param name="canSkin">
+    /// Whether the character has skinning. A setting rather than a reading: the bot would
+    /// otherwise have to interpret the spellbook, and a character that walks to every corpse
+    /// and fails to skin it is worse than one that never tries.
+    /// </param>
     public WorldCharacterView(
         World world,
         NativeFunctions natives,
         ILuaEvaluator lua,
-        Func<WoWUnit, bool>? isHostile = null)
+        Func<WoWUnit, bool>? isHostile = null,
+        bool canSkin = false)
     {
         _world = world ?? throw new ArgumentNullException(nameof(world));
         _natives = natives ?? throw new ArgumentNullException(nameof(natives));
         _lua = lua ?? throw new ArgumentNullException(nameof(lua));
         _isHostile = isHostile ?? CouldBeHostile;
+        _canSkin = canSkin;
     }
 
     /// <inheritdoc />
@@ -114,6 +122,23 @@ public sealed class WorldCharacterView : ICharacterView
             .Where(unit => !unit.DynamicFlags.HasFlag(UnitDynamicFlags.Tapped)
                 || unit.DynamicFlags.HasFlag(UnitDynamicFlags.TappedByMe))
             .Select(Describe)];
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// The skinnable flag is set on a corpse once its loot has been taken, so this list and
+    /// <see cref="LootableCorpses"/> never overlap — which is what lets the tree work them in
+    /// turn rather than walking to the same corpse twice.
+    /// </remarks>
+    public IReadOnlyList<CandidateTarget> SkinnableCorpses =>
+        _canSkin
+            ?
+            [
+                .. _world.UnitsNear(SearchRange)
+                    .Where(unit => unit.IsDead)
+                    .Where(unit => unit.Flags.HasFlag(UnitFlags.Skinnable))
+                    .Select(Describe),
+            ]
+            : [];
 
     /// <inheritdoc />
     public IReadOnlyList<VisibleObject> VisibleObjects

@@ -31,6 +31,10 @@ zero, anything may change.
 
 ### Added
 
+- **Skinning.** A corpse becomes skinnable once looted, so the root tree works looting and
+  skinning in turn and the character makes one trip to each body.
+- **A crafting bot base.** Opens a profession, makes whatever raises the skill fastest or a
+  named recipe, and stops with a named reason rather than in silence.
 - **Errands are now carried out, not just decided.** `ErrandHandler` walks to a vendor from the
   profile's `Vendors` section, repairs, sells what the loot rules pick, and posts keepable items
   to another character. `LuaVendor` does the client half.

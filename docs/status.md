@@ -82,14 +82,11 @@ that is exactly what used to happen.
 profile has no way to express and this project has no data for. The planner can ask for it; the
 handler reports that it cannot and abandons the errand.
 
-### No crafting bot base
+### Nothing buys materials, and nothing visits a trainer
 
-Phase 9 is mostly done: the activity scheduler mixes activities within a session, opportunistic
-gathering picks up nodes passed on the way, and `LuaTradeSkills` reads what a character can make
-and decides what is worth making next. See [activities.md](activities.md).
-
-What does not exist is the loop that stands at an anvil and works through a queue, or anything
-that buys materials to feed it. The decisions are written and tested; the base is not.
+The crafting base makes what the character is carrying and then stops. Working out what a recipe
+needs takes item data this project does not ship. Likewise the `Train` errand: it needs a
+trainer for the character's own class, which a profile cannot express.
 
 ## Outstanding assumptions
 

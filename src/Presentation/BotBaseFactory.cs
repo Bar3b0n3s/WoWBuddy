@@ -3,6 +3,7 @@ using WoWBuddy.BotBases;
 using WoWBuddy.BotBases.Battlegrounds;
 using WoWBuddy.BotBases.Group;
 using WoWBuddy.BotBases.Questing;
+using WoWBuddy.BotBases.Support;
 using WoWBuddy.Common.Geometry;
 using WoWBuddy.Profiles;
 using WoWBuddy.WorldData;
@@ -67,7 +68,9 @@ public static class BotBaseFactory
         WorldMemory? memory = null,
         PartyRole role = PartyRole.None,
         IReadOnlyDictionary<string, Node<IBotState>>? behaviors = null,
-        FishingHooks? fishing = null)
+        FishingHooks? fishing = null,
+        ITradeSkills? tradeSkills = null,
+        CraftSettings? crafting = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
@@ -79,6 +82,7 @@ public static class BotBaseFactory
             "QUESTING" => Questing(profile, behaviors),
             "DUNGEON" => Dungeon(profile, role),
             "BATTLEGROUND" => Battleground(profile),
+            "CRAFT" => Craft(tradeSkills, crafting),
             _ => new BotBaseBuild(null, $"'{name}' is not a bot base this build knows about."),
         };
     }
@@ -216,6 +220,30 @@ public static class BotBaseFactory
         return new BotBaseBuild(
             new BattlegroundBotBase(settings).Build(),
             $"Queueing for {profile.Name}, working {plan.Posts.Count} post(s).");
+    }
+
+    private static BotBaseBuild Craft(ITradeSkills? skills, CraftSettings? settings)
+    {
+        if (skills is null)
+        {
+            return new BotBaseBuild(
+                null,
+                "The crafting base reads the character's professions out of the client, which "
+                + "means attaching and enabling execution first.");
+        }
+
+        if (settings is not { IsUsable: true })
+        {
+            return new BotBaseBuild(
+                null,
+                "Name a profession to work on, as the client spells it.");
+        }
+
+        return new BotBaseBuild(
+            new CraftBotBase(settings).Build(skills),
+            settings.Recipe.Length > 0
+                ? $"Making {settings.Recipe} until the materials run out."
+                : $"Working {settings.Profession} up while the materials last.");
     }
 
     /// <summary>Every place a profile names, in written order.</summary>

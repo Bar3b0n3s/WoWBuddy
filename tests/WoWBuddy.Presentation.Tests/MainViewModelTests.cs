@@ -306,7 +306,7 @@ public sealed class MainViewModelTests
     {
         MainViewModel model = Build(out _, out _);
 
-        Assert.Equal(6, model.BotBases.Count);
+        Assert.Equal(7, model.BotBases.Count);
         Assert.Contains(model.BotBases, option => option.NeedsGroup);
         Assert.Contains(model.BotBases, option => option.NeedsProfile);
     }

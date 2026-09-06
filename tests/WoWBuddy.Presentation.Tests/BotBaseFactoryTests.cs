@@ -1,6 +1,7 @@
 using WoWBuddy.Behavior;
 using WoWBuddy.BotBases;
 using WoWBuddy.BotBases.Group;
+using WoWBuddy.BotBases.Support;
 using WoWBuddy.Common.Geometry;
 using WoWBuddy.Presentation;
 using WoWBuddy.Profiles;
@@ -172,6 +173,37 @@ public sealed class BotBaseFactoryTests
     }
 
     [Fact]
+    public void RefusesToCraftBeforeAttaching()
+    {
+        // The recipe list is the character's own spellbook, which needs a client.
+        BotBaseBuild built = BotBaseFactory.Create("Craft");
+
+        Assert.False(built.Success);
+        Assert.Contains("enabling execution first", built.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RefusesToCraftWithoutAProfession()
+    {
+        BotBaseBuild built = BotBaseFactory.Create("Craft", tradeSkills: new StubTradeSkills());
+
+        Assert.False(built.Success);
+        Assert.Contains("Name a profession", built.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildsACraftingBaseWhenItHasBoth()
+    {
+        BotBaseBuild built = BotBaseFactory.Create(
+            "Craft",
+            tradeSkills: new StubTradeSkills(),
+            crafting: new CraftSettings { Profession = "Cooking" });
+
+        Assert.True(built.Success);
+        Assert.Contains("Cooking", built.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void EveryBotBaseTheWindowOffersCanBeBuilt()
     {
         // A window offering a choice the factory does not recognise is a dead menu entry.
@@ -181,10 +213,31 @@ public sealed class BotBaseFactoryTests
         foreach (BotBaseOption option in BotBaseOption.All)
         {
             BotBaseBuild built = BotBaseFactory.Create(
-                option.Name, profile, role: PartyRole.Damage, fishing: Hooks);
+                option.Name,
+                profile,
+                role: PartyRole.Damage,
+                fishing: Hooks,
+                tradeSkills: new StubTradeSkills(),
+                crafting: new CraftSettings { Profession = "Cooking" });
 
             Assert.True(built.Success, $"{option.Name} could not be built: {built.Message}");
             Assert.NotNull(built.Tree);
         }
     }
+}
+
+/// <summary>A profession window with nothing in it.</summary>
+internal sealed class StubTradeSkills : ITradeSkills
+{
+    public TradeSkillLine Line => default;
+
+    public IReadOnlyList<TradeSkillRecipe> Recipes => [];
+
+    public bool Open(string profession) => true;
+
+    public TradeSkillRecipe? BestForSkillUp() => null;
+
+    public int Craft(TradeSkillRecipe recipe, int count = 1) => 0;
+
+    public bool Close() => true;
 }

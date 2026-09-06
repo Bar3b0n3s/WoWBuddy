@@ -48,6 +48,7 @@ public sealed class BotController : IBotController
     private Timer? _timer;
     private MovementController? _movement;
     private SpellCaster? _caster;
+    private LuaTradeSkills? _tradeSkills;
     private int _ticking;
 
     /// <inheritdoc />
@@ -137,6 +138,7 @@ public sealed class BotController : IBotController
         // the client whether the bot's scripts run in a secure context, and casting stays off
         // if the answer is no.
         _caster = new SpellCaster(lua);
+        _tradeSkills = new LuaTradeSkills(lua, CapabilityProbes.Probe(lua));
 
         if (!_caster.SelfTest(out string castDetail))
         {
@@ -166,6 +168,7 @@ public sealed class BotController : IBotController
 
         ClientCapabilities = string.Empty;
         _caster = null;
+        _tradeSkills = null;
         _world = null;
         _client?.Dispose();
         _client = null;
@@ -210,7 +213,11 @@ public sealed class BotController : IBotController
             return $"There is no combat routine called '{routine}'.";
         }
 
-        BotBaseBuild built = BotBaseFactory.Create(botBase, profile);
+        BotBaseBuild built = BotBaseFactory.Create(
+            botBase,
+            profile,
+            tradeSkills: _tradeSkills,
+            crafting: new CraftSettings { Profession = string.Empty });
 
         if (!built.Success)
         {

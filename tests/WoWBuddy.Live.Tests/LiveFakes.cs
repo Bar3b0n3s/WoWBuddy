@@ -33,6 +33,8 @@ internal sealed class FakeCharacterView : ICharacterView
 
     public IReadOnlyList<CandidateTarget> LootableCorpses { get; set; } = [];
 
+    public IReadOnlyList<CandidateTarget> SkinnableCorpses { get; set; } = [];
+
     public IReadOnlyList<VisibleObject> VisibleObjects { get; set; } = [];
 
     public Vector3? CorpsePosition { get; set; }

@@ -85,9 +85,32 @@ Two things it does not do. It does not open the window — casting a profession 
 any other and belongs with the casting that already exists. And it does not buy materials, so it
 makes what the character is carrying and then stops.
 
+## The crafting base
+
+`CraftBotBase` opens a profession, works out what to make, and keeps making it. The client does
+the hard part — it knows what the character can make and what the bags can make it from — so the
+base only decides what is worth making and keeps asking.
+
+Every way it can stop is a named reason rather than silence, because a crafting session that
+quietly does nothing looks exactly like one that is working: no profession named, the window
+would not open, the skill is at its training cap, the materials ran out, or the named recipe is
+one the character does not know. Once stopped it stays stopped until reset — a session that
+restarted itself would burn a night's materials.
+
+**It does not buy materials.** Working out what a recipe needs takes item data this project does
+not ship, so it makes what the character is carrying and then stops with a reason.
+
 ## What is not here
 
-A crafting bot base. The reader and the "what should I make next" decision are done and tested;
-the loop that stands at an anvil and works through a queue is not, and neither is buying
-materials to feed it. Both wait on the same thing everything else does — see
-[status.md](status.md).
+Buying materials to feed the crafting base, and taking a character to a trainer when a
+profession or a skill hits its cap. Both need data this project does not ship.
+
+## Skinning
+
+A corpse becomes skinnable once its loot has been taken, so the two lists never overlap and the
+root tree works them in turn — skinning below looting, which means one trip to each body rather
+than two. It sits above resting for the same reason looting does: a corpse is on a timer and the
+character's health is not.
+
+Skinning is a setting rather than something the bot reads. A character that walks to every
+corpse and fails to skin it is worse than one that never tries.

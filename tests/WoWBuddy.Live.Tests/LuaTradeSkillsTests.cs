@@ -1,3 +1,4 @@
+using WoWBuddy.BotBases.Support;
 using WoWBuddy.Core.Tests;
 using WoWBuddy.GameApi.Capabilities;
 using WoWBuddy.Live;

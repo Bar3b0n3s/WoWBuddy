@@ -215,4 +215,14 @@ public interface IBotState
 
     /// <summary>Doing business with a vendor or a mailbox.</summary>
     IVendorActions Vendor { get; }
+
+    /// <summary>
+    /// Corpses the character has looted that still hold a skin.
+    /// </summary>
+    /// <remarks>
+    /// Separate from <see cref="LootableCorpses"/> because a corpse becomes skinnable only
+    /// after its loot has been taken, so the two never overlap and the bot works them in turn.
+    /// Empty when the character cannot skin.
+    /// </remarks>
+    IReadOnlyList<CandidateTarget> SkinnableCorpses { get; }
 }

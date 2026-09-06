@@ -210,6 +210,9 @@ public sealed class FakeBotState : IBotState
     /// <summary>Whether the bags hold anything a vendor would pay for.</summary>
     public bool HasSellableItems { get; set; } = true;
 
+    /// <summary>Corpses that still hold a skin.</summary>
+    public IReadOnlyList<CandidateTarget> SkinnableCorpses { get; set; } = [];
+
     /// <summary>Business with a vendor or a mailbox.</summary>
     public FakeVendor VendorState { get; } = new();
 

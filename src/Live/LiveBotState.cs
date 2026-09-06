@@ -143,6 +143,9 @@ public sealed class LiveBotState : IBotState, IProfileConditionContext
     public IReadOnlyList<CandidateTarget> LootableCorpses => _view.LootableCorpses;
 
     /// <inheritdoc />
+    public IReadOnlyList<CandidateTarget> SkinnableCorpses => _view.SkinnableCorpses;
+
+    /// <inheritdoc />
     public IReadOnlyList<VisibleObject> VisibleObjects => _view.VisibleObjects;
 
     /// <inheritdoc />

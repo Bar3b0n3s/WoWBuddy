@@ -1,68 +1,10 @@
 using System.Globalization;
+using WoWBuddy.BotBases.Support;
 using WoWBuddy.Common.Logging;
 using WoWBuddy.Core.Execution;
 using WoWBuddy.GameApi.Capabilities;
 
 namespace WoWBuddy.Live;
-
-/// <summary>How much skill a recipe is still worth.</summary>
-/// <remarks>
-/// The client's own words, in its own colours: orange always gives a point, yellow usually,
-/// green sometimes, grey never. A character levelling a profession wants the highest colour it
-/// can still make; one making something to sell does not care.
-/// </remarks>
-public enum RecipeDifficulty
-{
-    /// <summary>The client said something this project does not recognise.</summary>
-    Unknown,
-
-    /// <summary>Orange. Always gives a skill point.</summary>
-    Optimal,
-
-    /// <summary>Yellow. Usually gives one.</summary>
-    Medium,
-
-    /// <summary>Green. Sometimes gives one.</summary>
-    Easy,
-
-    /// <summary>Grey. Never gives one.</summary>
-    Trivial,
-}
-
-/// <summary>Something the character knows how to make.</summary>
-/// <param name="Index">Its place in the client's list, which is what making it takes.</param>
-/// <param name="Name">What it is called.</param>
-/// <param name="Difficulty">How much skill it is still worth.</param>
-/// <param name="Available">How many the character has the materials for.</param>
-public readonly record struct TradeSkillRecipe(
-    int Index,
-    string Name,
-    RecipeDifficulty Difficulty,
-    int Available)
-{
-    /// <summary>True when the character could make at least one right now.</summary>
-    public bool CanMake => Available > 0;
-
-    /// <summary>True when making it might still raise the skill.</summary>
-    public bool RaisesSkill => Difficulty is RecipeDifficulty.Optimal
-        or RecipeDifficulty.Medium
-        or RecipeDifficulty.Easy;
-
-    public override string ToString() => $"{Name} ({Difficulty}, {Available} makeable)";
-}
-
-/// <summary>Which profession window is open, and how far along it is.</summary>
-/// <param name="Name">The profession, as the client names it.</param>
-/// <param name="Rank">Current skill.</param>
-/// <param name="MaxRank">What this rank of training allows.</param>
-public readonly record struct TradeSkillLine(string Name, int Rank, int MaxRank)
-{
-    /// <summary>True when the character has hit the cap for its current training.</summary>
-    public bool IsCapped => MaxRank > 0 && Rank >= MaxRank;
-
-    /// <summary>True when a window is actually open.</summary>
-    public bool IsOpen => !string.IsNullOrEmpty(Name);
-}
 
 /// <summary>
 /// What the character can make, read from the client's own trade skill window.
@@ -80,7 +22,7 @@ public readonly record struct TradeSkillLine(string Name, int Rank, int MaxRank)
 /// here.
 /// </para>
 /// </remarks>
-public sealed class LuaTradeSkills
+public sealed class LuaTradeSkills : ITradeSkills
 {
     /// <summary>Separates fields within a row.</summary>
     private const char FieldSeparator = '\u001F';
@@ -233,6 +175,28 @@ public sealed class LuaTradeSkills
             "Making {Count} x {Recipe}", wanted, recipe.Name);
 
         return wanted;
+    }
+
+    /// <summary>
+    /// Opens a profession's window.
+    /// </summary>
+    /// <remarks>
+    /// Casting a profession is a spell like any other, which is why this is one line: the
+    /// client works out the rest.
+    /// </remarks>
+    public bool Open(string profession)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(profession);
+
+        if (!Supports())
+        {
+            return false;
+        }
+
+        Invalidate();
+
+        return _lua.Execute(
+            $"CastSpellByName(\"{profession.Replace("\"", "\\\"", StringComparison.Ordinal)}\")");
     }
 
     /// <summary>Closes the window.</summary>
