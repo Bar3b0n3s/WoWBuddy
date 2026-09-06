@@ -101,7 +101,8 @@ public sealed class FakeLua : ILuaEvaluator
             "GetNumQuestLogEntries", "GetQuestLogTitle", "SelectQuestLogEntry", "GetQuestLink",
             "GetQuestLogLeaderBoard", "GetNumQuestLeaderBoards", "AcceptQuest", "CompleteQuest", "GetQuestReward",
             "GetNumQuestChoices", "GetNumPartyMembers", "UnitGUID", "UnitHealth",
-            "UnitHealthMax", "UnitIsUnit", "GetItemCount", "GetContainerNumSlots",
+            "UnitHealthMax", "UnitName", "UnitIsDeadOrGhost", "UnitIsConnected",
+            "UnitIsPartyLeader", "UnitAffectingCombat", "IsInInstance", "FollowUnit", "GetItemCount", "GetContainerNumSlots",
             "GetContainerItemLink", "UseItemByName", "GetBattlefieldStatus", "JoinBattlefield",
             "AcceptBattlefieldPort", "LeaveBattlefield");
 
