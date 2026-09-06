@@ -48,12 +48,23 @@ behaviour tree with it. The composition is done and tested:
 | Quest log, party, battleground queue, bags | Lua, via four adapters | calls checked for existence; behaviour assumed |
 | Paths and walking | navigation meshes and click-to-move | verified, and gated behind an explicit enable |
 
-**What is left is `WorldCharacterView`** — the thin class that answers `ICharacterView` from a
-live `World` and the native call wrappers. Everything above it is exercised by 126 tests against
-a fake view; that one class is the remaining unwritten piece, and it is deliberately small
-enough to read in one sitting once written.
+`WorldCharacterView` answers `ICharacterView` from a live `World`, and is deliberately the
+thinnest file in the project: every member is a read through the verified offset table or a call
+through the execution layer, with no judgement in it beyond turning game objects into plain
+values.
 
-Until it exists the Start button still refuses, and says so.
+**The one judgement it does make is hostility, and it is an approximation.** Whether a creature
+is an enemy is decided by its faction template, and resolving one needs a data file this project
+does not ship. `HostilityRule` instead excludes what can be ruled out — players, anything
+wearing NPC flags, unselectable and pacified units — and leaves the rest to the profile's avoid
+list. It will occasionally offer a neutral critter as a target. A user who has faction data can
+supply a better rule; the view takes one.
+
+**What has never happened is any of it running against a real client.** The composition above
+the view has 139 tests behind it; the view itself is client interaction and cannot be tested
+away from a game. Every Lua verb in it — `RepopMe`, `RetrieveCorpse`, `InteractUnit`,
+`LootSlot`, `SitStandOrDescendStart` — is written from the shape of the 3.3.5a API and has not
+been watched working.
 
 ### No crafting bot base
 
