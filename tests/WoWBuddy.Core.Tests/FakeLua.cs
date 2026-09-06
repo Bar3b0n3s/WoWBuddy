@@ -103,8 +103,10 @@ public sealed class FakeLua : ILuaEvaluator
             "GetNumQuestChoices", "GetNumPartyMembers", "UnitGUID", "UnitHealth",
             "UnitHealthMax", "UnitName", "UnitIsDeadOrGhost", "UnitIsConnected",
             "UnitIsPartyLeader", "UnitAffectingCombat", "IsInInstance", "FollowUnit", "GetItemCount", "GetContainerNumSlots",
-            "GetContainerItemLink", "UseItemByName", "GetBattlefieldStatus", "JoinBattlefield",
-            "AcceptBattlefieldPort", "LeaveBattlefield");
+            "GetContainerItemLink", "UseItemByName", "GetBattlefieldStatus", "GetBattlefieldWinner",
+            "GetBattlefieldInstanceRunTime", "GetNumBattlegroundTypes", "GetBattlegroundInfo",
+            "RequestBattlegroundInstanceInfo", "JoinBattlefield", "AcceptBattlefieldPort",
+            "LeaveBattlefield");
 
         return lua;
     }

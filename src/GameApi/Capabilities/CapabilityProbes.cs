@@ -89,7 +89,11 @@ public static class CapabilityProbes
             "UseItem objectives cannot run."),
 
         new(GameCapability.Battlegrounds,
-            ["GetBattlefieldStatus", "JoinBattlefield", "AcceptBattlefieldPort", "LeaveBattlefield"],
+            // Exactly what LuaBattlegrounds calls. GetBattlefieldInstanceRunTime is how the bot
+            // tells "the gates are open" from "we are still stood behind them".
+            ["GetBattlefieldStatus", "GetBattlefieldWinner", "GetBattlefieldInstanceRunTime",
+             "GetNumBattlegroundTypes", "GetBattlegroundInfo", "RequestBattlegroundInstanceInfo",
+             "JoinBattlefield", "AcceptBattlefieldPort", "LeaveBattlefield"],
             "queueing for and leaving a battleground",
             "The battleground base cannot queue. It can still play one you joined by hand."),
     ];
