@@ -45,10 +45,15 @@ public static class RootTree
     /// Carries an errand out: walks to the vendor, sells, repairs, posts the mail. Omit and
     /// errands are never started, because beginning one nothing can finish would stop the bot.
     /// </param>
+    /// <param name="talents">
+    /// The order to spend talent points in. Omit and points are left unspent, which is the
+    /// right answer: spending them in the wrong order costs gold to undo.
+    /// </param>
     public static BehaviorTree<IBotState> Build(
         Node<IBotState> botBase,
         ErrandPlanner? errands = null,
-        Node<IBotState>? errandHandler = null)
+        Node<IBotState>? errandHandler = null,
+        TalentBuild? talents = null)
     {
         ArgumentNullException.ThrowIfNull(botBase);
 
@@ -86,6 +91,7 @@ public static class RootTree
                 // drink risks the corpse expiring.
                 HandleLooting(),
                 HandleSkinning(),
+                HandleTalents(talents),
 
                 HandleRest(),
                 HandleErrands(errands, errandHandler),
@@ -302,6 +308,65 @@ public static class RootTree
             { Name = "Combat" })
         { Name = "Handle combat" };
 
+
+
+    /// <summary>
+    /// Spending a talent point when one is going spare.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Out of combat only, and one point per tick: the client refuses a talent whose
+    /// prerequisites are not met, and taking them one at a time means the next tick sees the
+    /// tree as it is now rather than as the build assumed it would be.
+    /// </para>
+    /// <para>
+    /// <b>Nothing is spent without a build.</b> Points sitting unspent cost nothing; points
+    /// spent in the wrong order cost gold to undo, and this project has no talent data with
+    /// which to work out a right order.
+    /// </para>
+    /// </remarks>
+    public static Node<IBotState> HandleTalents(TalentBuild? build)
+    {
+        if (build is not { IsUsable: true })
+        {
+            return new Check<IBotState>(_ => false) { Name = "No talent build" };
+        }
+
+        return new If<IBotState>(
+            s => !s.IsInCombat && s.Talents.UnspentPoints > 0,
+            new Do<IBotState>(s =>
+            {
+                // The build lists picks in order, and the character has already taken as many
+                // as it has levels for. Which one is next follows from how many are left.
+                int spent = build.Points - s.Talents.UnspentPoints;
+
+                if (spent < 0 || spent >= build.Points)
+                {
+                    // More points than the build accounts for. Leaving them is right: the
+                    // build has run out and nothing here knows what should come next.
+                    return RunStatus.Failure;
+                }
+
+                TalentPick pick = build.Picks[spent];
+
+                if (!s.Talents.Learn(pick))
+                {
+                    // Refused, almost always because a prerequisite further up the tree is not
+                    // met yet — which means the build is wrong, and repeating it every tick
+                    // would fill the log without ever succeeding.
+                    Log.For<IBotState>().Warning(
+                        "The client refused talent {Pick}. The build is probably in the wrong "
+                        + "order; the remaining points have been left unspent.", pick);
+
+                    return RunStatus.Failure;
+                }
+
+                Log.For<IBotState>().Information("Spent a talent point on {Pick}", pick);
+                return RunStatus.Success;
+            })
+            { Name = "Spend a talent point" })
+        { Name = "Handle talents" };
+    }
 
     /// <summary>How close the character has to be to skin something.</summary>
     public const float SkinRange = 4f;

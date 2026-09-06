@@ -216,6 +216,9 @@ public interface IBotState
     /// <summary>Doing business with a vendor or a mailbox.</summary>
     IVendorActions Vendor { get; }
 
+    /// <summary>Spending talent points.</summary>
+    ITalents Talents { get; }
+
     /// <summary>
     /// Corpses the character has looted that still hold a skin.
     /// </summary>

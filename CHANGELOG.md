@@ -31,6 +31,9 @@ zero, anything may change.
 
 ### Added
 
+- **Talent points are spent from a build you write.** `1:3, 1:3, 2:5` — one point per tick, out
+  of combat, in the order given, stopping the moment the client refuses one. No build means no
+  spending, which costs nothing.
 - **The window remembers what you chose.** Bot base, routine, profile, group role, skinning,
   mail recipient and where the navigation meshes are. Nothing that could log a character in.
 - **Skinning.** A corpse becomes skinnable once looted, so the root tree works looting and

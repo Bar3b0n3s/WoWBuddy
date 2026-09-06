@@ -210,6 +210,11 @@ public sealed class FakeBotState : IBotState
     /// <summary>Whether the bags hold anything a vendor would pay for.</summary>
     public bool HasSellableItems { get; set; } = true;
 
+    /// <summary>Spending talent points.</summary>
+    public FakeTalents TalentState { get; } = new();
+
+    public ITalents Talents => TalentState;
+
     /// <summary>Corpses that still hold a skin.</summary>
     public IReadOnlyList<CandidateTarget> SkinnableCorpses { get; set; } = [];
 

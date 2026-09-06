@@ -41,6 +41,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -93,6 +94,17 @@
                 <CheckBox Grid.Row="1" Grid.Column="6" Content="Skinning" Margin="6,8,0,0"
                           VerticalAlignment="Center"
                           IsChecked="{Binding CanSkin}" />
+
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="Talents:" VerticalAlignment="Center"
+                           Margin="0,8,6,0" />
+                <TextBox Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="5" VerticalAlignment="Center"
+                         Margin="0,8,0,0"
+                         Text="{Binding TalentBuild, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="The order to spend points in, as tab:index pairs — 1:3, 1:3, 2:5. Blank leaves them unspent." />
+                <TextBlock Grid.Row="2" Grid.Column="6" Margin="6,8,0,0" Foreground="Firebrick"
+                           TextTrimming="CharacterEllipsis"
+                           Text="{Binding TalentBuildError}"
+                           ToolTip="{Binding TalentBuildError}" />
             </Grid>
         </GroupBox>
 

@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using WoWBuddy.BotBases.Group;
+using Support = WoWBuddy.BotBases.Support;
 using WoWBuddy.CombatRoutines;
 using WoWBuddy.Common.Configuration;
 using WoWBuddy.Plugins;
@@ -469,6 +470,27 @@ public sealed class MainViewModel : ObservableObject
         get => _settings.MailRecipient;
         set => Remember(_settings with { MailRecipient = value }, nameof(MailRecipient));
     }
+
+    /// <summary>The order to spend talent points in.</summary>
+    public string TalentBuild
+    {
+        get => _settings.TalentBuild;
+        set
+        {
+            Remember(_settings with { TalentBuild = value }, nameof(TalentBuild));
+
+            // Validated as it is typed, because the alternative is finding out at the moment a
+            // level-up hands the character a point it then spends wrongly.
+            TalentBuildError = Support.TalentBuild.TryParse(value, out _, out string error)
+                ? string.Empty
+                : error;
+
+            Raise(nameof(TalentBuildError));
+        }
+    }
+
+    /// <summary>What is wrong with the talent build, or empty when nothing is.</summary>
+    public string TalentBuildError { get; private set; } = string.Empty;
 
     /// <summary>Where the navigation meshes are, or empty for the folder beside the bot.</summary>
     public string MmapsDirectory

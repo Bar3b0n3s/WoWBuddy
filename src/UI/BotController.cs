@@ -256,7 +256,12 @@ public sealed class BotController(BotSettings? settings = null) : IBotController
         // this line, and a user who never gets here has had nothing injected that moves them.
         _movement!.Enable();
 
-        _runner = new BotRunner(state, RootTree.Build(_tree!, planner, errandHandler).Root);
+        // A build that does not parse leaves points unspent rather than spending them wrongly.
+        TalentBuild.TryParse(_settings.TalentBuild, out TalentBuild talents, out _);
+
+        _runner = new BotRunner(
+            state,
+            RootTree.Build(_tree!, planner, errandHandler, talents).Root);
         _runner.Start();
 
         // A tick every quarter second. Faster buys nothing — the client's own update rate is
@@ -298,6 +303,7 @@ public sealed class BotController(BotSettings? settings = null) : IBotController
             new LuaBattlegrounds(lua, _capabilities!),
             new LuaInventory(lua, _capabilities!),
             new LuaVendor(lua, _capabilities!),
+            new LuaTalents(lua, _capabilities!),
             new SessionScheduler(new SessionSchedule()),
             routine,
             new LiveCombatContext(lua, view, _caster));

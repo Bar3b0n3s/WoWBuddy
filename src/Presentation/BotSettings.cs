@@ -57,6 +57,15 @@ public sealed record BotSettings
     /// <summary>The recipe it makes, or empty for whatever raises the skill fastest.</summary>
     public string CraftRecipe { get; init; } = string.Empty;
 
+    /// <summary>
+    /// The order to spend talent points in, as <c>tab:index</c> pairs.
+    /// </summary>
+    /// <remarks>
+    /// Empty leaves points unspent, which costs nothing. Spending them in the wrong order costs
+    /// gold to undo, and this project has no talent data with which to work out a right order.
+    /// </remarks>
+    public string TalentBuild { get; init; } = string.Empty;
+
     /// <summary>Where the meshes actually are, resolved against the default.</summary>
     public string ResolveMmaps(string baseDirectory) =>
         MmapsDirectory.Length > 0

@@ -47,6 +47,9 @@ public enum GameCapability
 
     /// <summary>Doing business with a vendor or a mailbox.</summary>
     Vendor,
+
+    /// <summary>Spending talent points.</summary>
+    Talents,
 }
 
 /// <summary>One thing to ask the client about itself.</summary>

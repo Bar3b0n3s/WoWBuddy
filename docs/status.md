@@ -72,6 +72,7 @@ The window asks, keeps the answer, and never guesses:
 | Skinning | A character that walks to every corpse and fails to skin it is worse than one that never tries |
 | Mail recipient | There is no way to infer who your bank alt is |
 | Mesh folder | Extracting them puts them wherever the extractor ran; copying gigabytes next to the bot is a poor default |
+| Talent build | This project has no talent data. Unspent points cost nothing; wrongly spent ones cost gold to undo |
 
 Settings live beside the executable and hold nothing that could log a character in. This project
 makes no network calls, and storing an account password to be typed into a game client is a

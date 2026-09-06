@@ -118,6 +118,11 @@ public static class CapabilityProbes
              "CloseMerchant", "CloseMail"],
             "selling, repairing and posting mail",
             "Errands cannot be carried out; the bot will keep playing and let the bags fill."),
+
+        new(GameCapability.Talents,
+            ["GetUnspentTalentPoints", "GetTalentInfo", "LearnTalent"],
+            "spending talent points",
+            "Points are left unspent, which costs nothing."),
     ];
 
     /// <summary>Asks the client about every capability.</summary>
