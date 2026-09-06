@@ -69,7 +69,8 @@ scheduler. [docs/world-data.md](docs/world-data.md) covers how the bot learns wh
 [docs/profiles.md](docs/profiles.md) covers the profile format the questing base reads,
 with [docs/phase-7-manual-test.md](docs/phase-7-manual-test.md) for questing.
 [docs/combat-routines.md](docs/combat-routines.md) covers the thirty rotations and how to
-edit them. [docs/group-play.md](docs/group-play.md) covers parties, following, assisting, healing and
+edit them, and [docs/plugins.md](docs/plugins.md) what a plugin can do and why it is
+trusted differently from a profile. [docs/group-play.md](docs/group-play.md) covers parties, following, assisting, healing and
 battlegrounds, with [docs/phase-8-manual-test.md](docs/phase-8-manual-test.md) to check it.
 
 ## How this project handles low-level facts
@@ -120,6 +121,7 @@ src/Behavior     Behaviour tree engine
 src/CombatRoutines  Rotation engine and per-specialisation routines
 src/BotBases     Root behaviour tree and the grind base
 src/Profiles     Profile model, loader and validator
+src/Plugins      Plugin contract, loader and manager
 src/UI           WPF shell
 tools/Inspector  Read-only console dev tool
 tests/           Unit tests, including a simulated client

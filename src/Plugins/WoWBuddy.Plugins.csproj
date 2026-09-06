@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RootNamespace>WoWBuddy.Plugins</RootNamespace>
+    <AssemblyName>WoWBuddy.Plugins</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\BotBases\WoWBuddy.BotBases.csproj" />
+    <ProjectReference Include="..\Behavior\WoWBuddy.Behavior.csproj" />
+    <ProjectReference Include="..\CombatRoutines\WoWBuddy.CombatRoutines.csproj" />
+    <ProjectReference Include="..\Common\WoWBuddy.Common.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Serilog" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="WoWBuddy.Plugins.Tests" />
+  </ItemGroup>
+</Project>
