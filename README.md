@@ -7,9 +7,10 @@ the discontinued Honorbuddy. C# 12, .NET 8, WPF, Windows only. MIT licensed.
 > servers. Accounts get banned for it.** This project does not attempt to defeat server-side
 > anti-cheat. Using it is entirely at your own risk.
 
-## Status: phases 0, 1 and 2 complete
+## Status: a preview, and not yet a bot that plays
 
-The delivery plan runs to eleven phases. Three are done.
+Ten of the eleven phases are done, and one large piece is missing that stops the whole thing
+running unattended. Both halves of that sentence matter, so this section is specific.
 
 | Phase | State |
 | --- | --- |
@@ -17,61 +18,87 @@ The delivery plan runs to eleven phases. Three are done.
 | 1 — Attach and read: memory, offsets, object manager, typed objects, inspector | **Done** |
 | 2 — Execute: game-thread hook, Lua bridge, native calls, Lua console | **Done** |
 | 3 — Move: navigation meshes, path following, stuck handling | **Done** |
-| 4 — Fight: behaviour trees, four combat routines, grind bot base | **Done** |
+| 4 — Fight: behaviour trees, combat routines, grind bot base | **Done** |
 | 5 — Live: loot, gear, errand planning, scheduler, humanization | **Done** |
-| 6 — Gather and Fish bases, world data from your server database | **Done** |
-| 7 — Questing base, profile schema and importer | Next |
-| 8-11 — Dungeons, battlegrounds, professions, plugins, release | Not started |
+| 6 — Gather and Fish bases, world data | **Done** |
+| 7 — Questing base, profile schema and importer | **Done** |
+| 8 — Dungeons and battlegrounds, group play | **Done** |
+| 9 — Professions and the mixed-activity scheduler | **Not started** |
+| 10 — All thirty combat routines, plugins, UI | **Done** |
+| 11 — Docs, packaging, release | **Done** |
 
-**What works today.** Find a running 12340 client, attach, verify the offset table against
-that specific client, and walk the object manager to read the local player and everything
-around it. Then, optionally, install a hook on the client's render loop and run code on its
-own thread: execute Lua and read values back, and call the client's native functions.
+### What you can actually do today
 
-It can also load the navigation meshes you extract from your own client — from **either
-TrinityCore or AzerothCore**, whose formats differ — find paths through them, and walk the
-character along one with stuck detection and recovery.
+**Everything that reads a client works.** Find a running 12340 client, attach, verify the
+offset table against that specific client, and walk the object manager to read the local player
+and everything around it. Optionally install a hook on the render loop and run code on the
+client's own thread: execute Lua, read values back, and call native functions. The
+`WoWBuddy.Inspector` console tool exposes all of it, and it is the thing to run first.
 
-On top of that sits a behaviour tree, four combat routines (Fury Warrior, Frost Mage, Holy
-Priest, Beast Mastery Hunter) and a grind bot base: pick a target, close, pull, fight, loot,
-rest, and recover from dying. A scheduler runs sessions with randomised breaks and stop
-conditions, and loot rules, gear evaluation and errand planning decide what to keep, what to
-wear and when to go to town.
+**Everything that decides works, and is tested.** Six bot bases, thirty combat routines, the
+behaviour tree, navigation over TrinityCore or AzerothCore meshes, profiles, questing, group
+play, battlegrounds, loot and gear rules, the session scheduler, plugins. Seven hundred–odd
+tests cover it, including a simulated client and an x86 interpreter that executes the exact
+bytes the bot would inject.
 
-**What does not.** No *native* cast function is used: the two published addresses for it
-disagree and neither has been confirmed. Casting goes through the client's own script entry
-point instead, which existing bots for this build rely on and which the bot verifies against
-your client before using — it asks whether its scripts run in a secure context and stays
-disabled if the answer is no.
+### What is missing
 
-**Reading is separate from acting.** Attaching is read-only and cannot destabilise the
-client. Running code inside it is a second, explicit step (`EnableExecution`), so a user who
-only wants to inspect the object manager never has anything injected into their game.
+**Nothing yet joins the two halves together.** Every bot base and routine is written against an
+interface called `IBotState` and tested against a fake implementation of it. Four adapters that
+read a real client through Lua now exist — the quest log, the party, the battleground queue and
+the bags — but the class that composes them with the memory-derived state and drives the
+behaviour tree on a timer does not. **So the Start button builds a tree and then tells you it
+cannot play it.**
+
+**Some of the Lua underneath is unverified.** Positions, health, targets and the object manager
+rest on offsets that are checked against your client at attach time. The quest log, party, bags
+and battleground queue rest on scripting calls whose *existence* the bot checks at attach time
+but whose *exact behaviour* nobody has confirmed on a real 12340 client. The manual test scripts
+exist to confirm them, and running one is the single most useful thing a user can contribute.
+
+See [docs/status.md](docs/status.md) for the detail, including exactly which assumptions are
+outstanding.
 
 ## Try it
 
+Download a release from the [releases page](https://github.com/Bar3b0n3s/WoWBuddy/releases),
+unzip it, and run `WoWBuddy.Inspector.exe` with a character logged into the world:
+
+```
+WoWBuddy.Inspector.exe inspect
+```
+
+Or build it yourself:
+
 ```
 dotnet build WoWBuddy.sln -c Release
-
-# with a character logged into the world:
 dotnet run --project tools/WoWBuddy.Inspector -c Release -- inspect
 ```
 
-See [docs/setup.md](docs/setup.md), then work through
-[docs/phase-1-manual-test.md](docs/phase-1-manual-test.md) to confirm the offsets match your
-client, and [docs/phase-2-manual-test.md](docs/phase-2-manual-test.md) before letting
-anything run inside it. For movement, [docs/navigation-data.md](docs/navigation-data.md)
-covers extracting navigation data and [docs/phase-3-manual-test.md](docs/phase-3-manual-test.md)
-covers confirming click-to-move before anything writes to it,
-[docs/phase-4-manual-test.md](docs/phase-4-manual-test.md) covers combat, and
-[docs/phase-5-manual-test.md](docs/phase-5-manual-test.md) covers looting, gear and the
-scheduler. [docs/world-data.md](docs/world-data.md) covers how the bot learns where things are, and
-[docs/profiles.md](docs/profiles.md) covers the profile format the questing base reads,
-with [docs/phase-7-manual-test.md](docs/phase-7-manual-test.md) for questing.
-[docs/combat-routines.md](docs/combat-routines.md) covers the thirty rotations and how to
-edit them, and [docs/plugins.md](docs/plugins.md) what a plugin can do and why it is
-trusted differently from a profile. [docs/group-play.md](docs/group-play.md) covers parties, following, assisting, healing and
-battlegrounds, with [docs/phase-8-manual-test.md](docs/phase-8-manual-test.md) to check it.
+Read [docs/setup.md](docs/setup.md) first. Then work through the manual test scripts in order:
+[1](docs/phase-1-manual-test.md) confirms the offsets match your client,
+[2](docs/phase-2-manual-test.md) confirms code can run inside it safely,
+[3](docs/phase-3-manual-test.md) covers movement and click-to-move,
+[4](docs/phase-4-manual-test.md) combat, [5](docs/phase-5-manual-test.md) looting and the
+scheduler, [7](docs/phase-7-manual-test.md) questing, and
+[8](docs/phase-8-manual-test.md) group play and battlegrounds.
+
+### Reference documentation
+
+| Document | Covers |
+| --- | --- |
+| [status.md](docs/status.md) | What works, what does not, and every outstanding assumption |
+| [setup.md](docs/setup.md) | Getting a build running against your client |
+| [architecture.md](docs/architecture.md) | How the pieces fit, and why the seams are where they are |
+| [offsets.md](docs/offsets.md) | Every address, its source and its confidence |
+| [navigation-data.md](docs/navigation-data.md) | Extracting meshes from your own client |
+| [world-data.md](docs/world-data.md) | How the bot learns where things are |
+| [profiles.md](docs/profiles.md) | The profile format, and importing Honorbuddy ones |
+| [combat-routines.md](docs/combat-routines.md) | The thirty rotations and how to edit them |
+| [group-play.md](docs/group-play.md) | Parties, following, assisting, healing, battlegrounds |
+| [plugins.md](docs/plugins.md) | What a plugin can do, and why it is trusted differently |
+| [troubleshooting.md](docs/troubleshooting.md) | When something does not work |
+| [legal-and-licensing.md](docs/legal-and-licensing.md) | What may and may not be linked in |
 
 ## How this project handles low-level facts
 

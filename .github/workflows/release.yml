@@ -1,0 +1,105 @@
+name: Release
+
+# Packaging has to happen on Windows: the UI is WPF, which needs the Windows Desktop SDK, and
+# the executables are built x86 because they attach to a 32-bit game client.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to package, without the leading v"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Work out the version
+        id: version
+        shell: pwsh
+        run: |
+          $version = if ($env:GITHUB_REF -like 'refs/tags/v*') {
+            $env:GITHUB_REF -replace '^refs/tags/v', ''
+          } else {
+            '${{ github.event.inputs.version }}'
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "Packaging $version"
+
+      # A release that fails its own tests is not a release.
+      - name: Test
+        run: dotnet test WoWBuddy.sln -c Release --nologo
+
+      - name: Publish the UI
+        run: >
+          dotnet publish src/UI/WoWBuddy.UI.csproj -c Release -r win-x86
+          --self-contained false
+          -p:Version=${{ steps.version.outputs.version }}
+          -o publish/WoWBuddy
+
+      - name: Publish the Inspector
+        run: >
+          dotnet publish tools/WoWBuddy.Inspector/WoWBuddy.Inspector.csproj -c Release -r win-x86
+          --self-contained false
+          -p:Version=${{ steps.version.outputs.version }}
+          -o publish/WoWBuddy
+
+      - name: Assemble the release folder
+        shell: pwsh
+        run: |
+          # Documentation travels with the build: a user who unzips this and reads nothing
+          # else should still be able to find out what does and does not work.
+          Copy-Item README.md, LICENSE, CHANGELOG.md publish/WoWBuddy/
+          Copy-Item docs publish/WoWBuddy/docs -Recurse
+          Copy-Item profiles publish/WoWBuddy/profiles -Recurse
+
+          # An empty folder so it is obvious where plugins go.
+          New-Item -ItemType Directory -Path publish/WoWBuddy/Plugins | Out-Null
+          Set-Content publish/WoWBuddy/Plugins/README.txt @'
+          Put plugin assemblies here.
+
+          A plugin is code, and it is as trusted as WoWBuddy itself: it runs in this process and
+          can read and write the game's memory, your files, and the network. There is no sandbox.
+          Read what you load. See docs/plugins.md.
+          '@
+
+      - name: Zip it
+        shell: pwsh
+        run: |
+          Compress-Archive -Path publish/WoWBuddy/* `
+            -DestinationPath WoWBuddy-${{ steps.version.outputs.version }}-win-x86.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WoWBuddy-${{ steps.version.outputs.version }}-win-x86
+          path: WoWBuddy-${{ steps.version.outputs.version }}-win-x86.zip
+
+      - name: Create the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: WoWBuddy-${{ steps.version.outputs.version }}-win-x86.zip
+          body: |
+            See [CHANGELOG.md](CHANGELOG.md) for what changed and
+            [docs/status.md](docs/status.md) for what does and does not work.
+
+            **This is a preview.** WoWBuddy can read a 3.3.5a client and everything that decides
+            what a bot should do is written and tested, but nothing yet joins the two: it cannot
+            play unattended. The Inspector is the useful part today.
+
+            **Botting violates the terms of service of Blizzard's servers and the rules of most
+            private servers. Accounts get banned for it.** Entirely at your own risk.
+          draft: false
+          prerelease: true
