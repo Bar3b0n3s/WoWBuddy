@@ -39,8 +39,27 @@ public interface IBotController
     /// <summary>What the character is, once attached. Empty before that.</summary>
     string CharacterSummary { get; }
 
+    /// <summary>
+    /// True once the bot can run code inside the client.
+    /// </summary>
+    /// <remarks>
+    /// A separate step from attaching, and deliberately so: attaching only reads, and a user
+    /// who wants to look at what the bot can see should not have to let it write. Everything
+    /// that acts on the game — casting, moving, talking to quest givers — waits for this.
+    /// </remarks>
+    bool CanExecute { get; }
+
+    /// <summary>What the client can and cannot tell the bot, once execution is enabled.</summary>
+    string ClientCapabilities { get; }
+
     /// <summary>Attaches to a client.</summary>
     AttachOutcome Attach(ClientOption client);
+
+    /// <summary>
+    /// Installs the execution hook and asks the client what it supports.
+    /// </summary>
+    /// <returns>A sentence for the status bar.</returns>
+    string EnableExecution();
 
     /// <summary>Detaches, stopping first if it is running.</summary>
     void Detach();

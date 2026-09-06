@@ -32,6 +32,24 @@ internal sealed class FakeController : IBotController
 
     public string CharacterSummary { get; set; } = string.Empty;
 
+    public bool CanExecute { get; private set; }
+
+    public string ClientCapabilities { get; set; } = string.Empty;
+
+    /// <summary>Whether enabling execution succeeds.</summary>
+    public bool ExecutionSucceeds { get; set; } = true;
+
+    public string EnableExecution()
+    {
+        Actions.Add("EnableExecution");
+
+        CanExecute = ExecutionSucceeds;
+
+        return ExecutionSucceeds
+            ? "Execution enabled."
+            : "Could not install the execution hook.";
+    }
+
     /// <summary>What the bot was asked to do, in order.</summary>
     public List<string> Actions { get; } = [];
 
@@ -58,6 +76,7 @@ internal sealed class FakeController : IBotController
         Actions.Add("Detach");
         IsRunning = false;
         IsAttached = false;
+        CanExecute = false;
     }
 
     public string Start(string botBase, string routine, string? profilePath)

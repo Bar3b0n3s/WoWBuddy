@@ -51,6 +51,7 @@ public sealed class MainViewModel : ObservableObject
         RefreshCommand = new RelayCommand(RefreshClients);
         AttachCommand = new RelayCommand(Attach, () => CanAttach);
         DetachCommand = new RelayCommand(Detach, () => IsAttached);
+        EnableExecutionCommand = new RelayCommand(EnableExecution, () => CanEnableExecution);
         StartCommand = new RelayCommand(Start, () => CanStart);
         StopCommand = new RelayCommand(Stop, () => IsRunning);
 
@@ -175,6 +176,9 @@ public sealed class MainViewModel : ObservableObject
     /// <summary>Detaches from the client.</summary>
     public RelayCommand DetachCommand { get; }
 
+    /// <summary>Lets the bot run code inside the client, and asks what it supports.</summary>
+    public RelayCommand EnableExecutionCommand { get; }
+
     /// <summary>Starts playing.</summary>
     public RelayCommand StartCommand { get; }
 
@@ -186,6 +190,15 @@ public sealed class MainViewModel : ObservableObject
 
     /// <summary>True while playing.</summary>
     public bool IsRunning => _controller.IsRunning;
+
+    /// <summary>True once the bot can act on the game rather than only read it.</summary>
+    public bool CanExecute => _controller.CanExecute;
+
+    /// <summary>Whether enabling execution is possible now.</summary>
+    public bool CanEnableExecution => IsAttached && !CanExecute;
+
+    /// <summary>What the client can and cannot tell the bot.</summary>
+    public string ClientCapabilities => _controller.ClientCapabilities;
 
     /// <summary>
     /// True when attaching is possible.
@@ -200,6 +213,7 @@ public sealed class MainViewModel : ObservableObject
     /// <summary>True when the bot could start now.</summary>
     public bool CanStart =>
         IsAttached
+        && CanExecute
         && !IsRunning
         && SelectedRoutine is not null
         && (!NeedsProfile || _profile is not null);
@@ -220,6 +234,11 @@ public sealed class MainViewModel : ObservableObject
             if (!IsAttached)
             {
                 return "Attach to a client first.";
+            }
+
+            if (!CanExecute)
+            {
+                return "Enable execution first. The bot can read the client but not act on it.";
             }
 
             if (SelectedRoutine is null)
@@ -312,6 +331,14 @@ public sealed class MainViewModel : ObservableObject
             NarrowRoutinesToCharacter();
         }
 
+        RaiseAttachmentStates();
+    }
+
+    private void EnableExecution()
+    {
+        Status = _controller.EnableExecution();
+
+        Raise(nameof(ClientCapabilities));
         RaiseAttachmentStates();
     }
 
@@ -408,6 +435,8 @@ public sealed class MainViewModel : ObservableObject
     {
         Raise(nameof(IsAttached));
         Raise(nameof(IsRunning));
+        Raise(nameof(CanExecute));
+        Raise(nameof(CanEnableExecution));
         Raise(nameof(CharacterSummary));
         RaiseCommandStates();
     }
@@ -418,7 +447,10 @@ public sealed class MainViewModel : ObservableObject
         Raise(nameof(CanStart));
         Raise(nameof(StartBlockedReason));
 
+        Raise(nameof(CanEnableExecution));
+
         AttachCommand.RaiseCanExecuteChanged();
+        EnableExecutionCommand.RaiseCanExecuteChanged();
         DetachCommand.RaiseCanExecuteChanged();
         StartCommand.RaiseCanExecuteChanged();
         StopCommand.RaiseCanExecuteChanged();

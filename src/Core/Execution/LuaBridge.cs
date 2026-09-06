@@ -28,7 +28,7 @@ namespace WoWBuddy.Core.Execution;
 /// working chain could produce.
 /// </para>
 /// </remarks>
-public sealed class LuaBridge
+public sealed class LuaBridge : ILuaEvaluator
 {
     /// <summary>
     /// Name of the global the bridge assigns results to.

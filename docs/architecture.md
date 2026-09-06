@@ -149,6 +149,30 @@ the verbs that go with them. A good deal of that is Lua this project has not ver
 manual test scripts for [phase 7](phase-7-manual-test.md) and
 [phase 8](phase-8-manual-test.md), which exist precisely to check it.
 
+### Narrowing the unverified surface first
+
+The adapter's problem is not the memory — position, health, target, nearby units and the object
+manager are all verified already — it is the Lua. So before any of it is written, the bot now
+asks the attached client which of the calls it needs actually exist.
+
+`CapabilityProbes` runs once when execution is enabled and produces a report in the same spirit
+as the offset verification one. It asks about existence rather than behaviour, deliberately: a
+party call returns nothing when solo and a quest call returns nothing with an empty log, so
+asking what a call *returns* would switch features off for the wrong reason. `type(x) ==
+"function"` separates "this client cannot do that" from "you happen to have no quests".
+
+It distinguishes two kinds of absence, and the difference matters to a user. A **known gap** is
+something this project already believes 12340 lacks — `IsQuestFlaggedCompleted`, which arrived
+in 4.0, and `UnitGroupRolesAssigned`, which may or may not exist — and the report explains the
+consequence. A **surprise** is a call the bot expected to find and did not, which usually means
+the client is not the build it claims to be; in that case the offset table is suspect too, and
+the report says so.
+
+What the probe does not establish is that a call returns what this bot expects — that
+`GetQuestLogTitle` puts completion in the seventh slot, say. That needs a character with a quest
+in the log and a person to look at the answer, which is what the manual test scripts are for.
+The probe narrows the unverified surface; it does not close it.
+
 Until that adapter exists, the Start button builds the tree — which is real, and is where a
 profile that does not give a bot base what it needs is caught — and then says plainly that it
 cannot play. **A start button that ticked a tree fed on invented values would look like progress

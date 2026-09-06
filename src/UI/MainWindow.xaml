@@ -24,6 +24,10 @@
             <Button Content="Attach"  Width="80" Margin="6,0,0,0" Command="{Binding AttachCommand}" />
             <Button Content="Detach"  Width="80" Margin="6,0,0,0" Command="{Binding DetachCommand}" />
 
+            <Button Content="Enable execution" Width="120" Margin="6,0,0,0"
+                    Command="{Binding EnableExecutionCommand}"
+                    ToolTip="Attaching only reads the client. This lets the bot act on it." />
+
             <Separator Margin="12,0" />
 
             <Button Content="Start" Width="80" Command="{Binding StartCommand}"
@@ -79,6 +83,14 @@
                          VerticalScrollBarVisibility="Auto"
                          HorizontalScrollBarVisibility="Auto"
                          Text="{Binding VerificationReport, Mode=OneWay}" />
+            </TabItem>
+
+            <TabItem Header="Client capabilities">
+                <TextBox IsReadOnly="True" FontFamily="Consolas" FontSize="11"
+                         TextWrapping="NoWrap"
+                         VerticalScrollBarVisibility="Auto"
+                         HorizontalScrollBarVisibility="Auto"
+                         Text="{Binding ClientCapabilities, Mode=OneWay}" />
             </TabItem>
 
             <TabItem Header="Profile">

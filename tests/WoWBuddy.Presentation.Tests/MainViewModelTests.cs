@@ -124,6 +124,7 @@ public sealed class MainViewModelTests
         MainViewModel model = Build(out _, out FakeController controller);
 
         model.AttachCommand.Execute(null);
+        model.EnableExecutionCommand.Execute(null);
 
         Assert.True(model.CanStart);
         Assert.Empty(model.StartBlockedReason);
@@ -139,6 +140,7 @@ public sealed class MainViewModelTests
     {
         MainViewModel model = Build(out _, out FakeController controller);
         model.AttachCommand.Execute(null);
+        model.EnableExecutionCommand.Execute(null);
 
         model.SelectedBotBase = model.BotBases.First(option => option.Name == "Questing");
 
@@ -162,6 +164,7 @@ public sealed class MainViewModelTests
         {
             MainViewModel model = Build(out _, out _);
             model.AttachCommand.Execute(null);
+            model.EnableExecutionCommand.Execute(null);
             model.SelectedBotBase = model.BotBases.First(option => option.Name == "Questing");
             model.ProfilePath = path;
 
@@ -191,6 +194,7 @@ public sealed class MainViewModelTests
         {
             MainViewModel model = Build(out _, out FakeController controller);
             model.AttachCommand.Execute(null);
+            model.EnableExecutionCommand.Execute(null);
             model.SelectedBotBase = model.BotBases.First(option => option.Name == "Questing");
             model.ProfilePath = path;
 
@@ -236,6 +240,7 @@ public sealed class MainViewModelTests
         MainViewModel model = Build(out _, out FakeController controller);
 
         model.AttachCommand.Execute(null);
+        model.EnableExecutionCommand.Execute(null);
         model.StartCommand.Execute(null);
         model.DetachCommand.Execute(null);
 
@@ -251,6 +256,7 @@ public sealed class MainViewModelTests
         MainViewModel model = Build(out _, out _);
 
         model.AttachCommand.Execute(null);
+        model.EnableExecutionCommand.Execute(null);
         model.StartCommand.Execute(null);
         model.StopCommand.Execute(null);
 
@@ -303,6 +309,66 @@ public sealed class MainViewModelTests
         Assert.Equal(6, model.BotBases.Count);
         Assert.Contains(model.BotBases, option => option.NeedsGroup);
         Assert.Contains(model.BotBases, option => option.NeedsProfile);
+    }
+
+
+    [Fact]
+    public void ReadingIsAllowedBeforeActingIs()
+    {
+        // Attaching only reads. A user who wants to look at what the bot can see should not
+        // have to let it write to the client to do that.
+        MainViewModel model = Build(out _, out _);
+
+        model.AttachCommand.Execute(null);
+
+        Assert.True(model.IsAttached);
+        Assert.False(model.CanExecute);
+        Assert.True(model.CanEnableExecution);
+        Assert.False(model.CanStart);
+        Assert.Contains("read the client but not act on it", model.StartBlockedReason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EnablingExecutionShowsWhatTheClientSupports()
+    {
+        MainViewModel model = Build(out _, out FakeController controller);
+        controller.ClientCapabilities = "Client capabilities: 9 of 11 available.";
+
+        model.AttachCommand.Execute(null);
+        model.EnableExecutionCommand.Execute(null);
+
+        Assert.True(model.CanExecute);
+        Assert.False(model.CanEnableExecution);
+        Assert.Contains("9 of 11", model.ClientCapabilities, StringComparison.Ordinal);
+        Assert.Equal("Execution enabled.", model.Status);
+    }
+
+    [Fact]
+    public void AFailedExecutionHookLeavesTheBotAbleToRead()
+    {
+        MainViewModel model = Build(out _, out FakeController controller);
+        controller.ExecutionSucceeds = false;
+
+        model.AttachCommand.Execute(null);
+        model.EnableExecutionCommand.Execute(null);
+
+        Assert.True(model.IsAttached);
+        Assert.False(model.CanExecute);
+        Assert.False(model.CanStart);
+        Assert.Contains("Could not install", model.Status, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DetachingGivesUpExecutionToo()
+    {
+        MainViewModel model = Build(out _, out _);
+
+        model.AttachCommand.Execute(null);
+        model.EnableExecutionCommand.Execute(null);
+        model.DetachCommand.Execute(null);
+
+        Assert.False(model.CanExecute);
+        Assert.False(model.CanEnableExecution);
     }
 
     private static string WriteProfile(string xml)

@@ -18,6 +18,7 @@
       "tests\\WoWBuddy.CombatRoutines.Tests\\WoWBuddy.CombatRoutines.Tests.csproj",
       "tests\\WoWBuddy.Common.Tests\\WoWBuddy.Common.Tests.csproj",
       "tests\\WoWBuddy.Core.Tests\\WoWBuddy.Core.Tests.csproj",
+      "tests\\WoWBuddy.GameApi.Tests\\WoWBuddy.GameApi.Tests.csproj",
       "tests\\WoWBuddy.Navigation.Tests\\WoWBuddy.Navigation.Tests.csproj",
       "tests\\WoWBuddy.Plugins.Tests\\WoWBuddy.Plugins.Tests.csproj",
       "tests\\WoWBuddy.Presentation.Tests\\WoWBuddy.Presentation.Tests.csproj",

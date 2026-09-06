@@ -2,7 +2,9 @@ using System;
 using WoWBuddy.Behavior;
 using WoWBuddy.BotBases;
 using WoWBuddy.Core.Attach;
+using WoWBuddy.Core.Execution;
 using WoWBuddy.GameApi;
+using WoWBuddy.GameApi.Capabilities;
 using WoWBuddy.Presentation;
 using WoWBuddy.Profiles;
 
@@ -38,6 +40,12 @@ public sealed class BotController : IBotController
 
     /// <inheritdoc />
     public bool IsRunning { get; private set; }
+
+    /// <inheritdoc />
+    public bool CanExecute => _client?.Execution is { IsUsable: true };
+
+    /// <inheritdoc />
+    public string ClientCapabilities { get; private set; } = string.Empty;
 
     /// <inheritdoc />
     public string CharacterSummary
@@ -76,11 +84,54 @@ public sealed class BotController : IBotController
         return new AttachOutcome(true, result.Report.ToString(), "Attached.");
     }
 
+    /// <summary>
+    /// Installs the execution hook, proves the Lua round trip, and asks what the client can do.
+    /// </summary>
+    /// <remarks>
+    /// Three steps in one because the second and third are only meaningful after the first, and
+    /// each refuses rather than continuing: a hook that did not install means no Lua, a Lua
+    /// round trip that did not prove itself means every capability answer would be a guess, and
+    /// a capability that is missing means a feature is switched off rather than left to fail
+    /// four hours in.
+    /// </remarks>
+    public string EnableExecution()
+    {
+        if (_client is null)
+        {
+            return "Attach to a client first.";
+        }
+
+        ExecutionInstallResult install = _client.EnableExecution();
+
+        if (!install.Success)
+        {
+            ClientCapabilities = install.Report.ToString();
+            return $"Could not install the execution hook. {install.FailureReason}";
+        }
+
+        LuaBridge lua = install.Session!.Lua;
+
+        if (!lua.SelfTest(out string detail))
+        {
+            ClientCapabilities = $"The Lua round trip could not be proved against this client: {detail}";
+            return "Execution installed, but Lua could not be proved. The bot will not act on the game.";
+        }
+
+        CapabilityReport report = CapabilityProbes.Probe(lua);
+        ClientCapabilities = report.Describe();
+
+        return report.NothingUnexpected
+            ? "Execution enabled."
+            : "Execution enabled, but this client is missing calls the bot expected. Read the "
+                + "capabilities report before running anything.";
+    }
+
     /// <inheritdoc />
     public void Detach()
     {
         Stop();
 
+        ClientCapabilities = string.Empty;
         _world = null;
         _client?.Dispose();
         _client = null;
@@ -92,6 +143,11 @@ public sealed class BotController : IBotController
         if (_client is null)
         {
             return "Attach to a client first.";
+        }
+
+        if (!CanExecute)
+        {
+            return "Enable execution first.";
         }
 
         Profile? profile = null;
