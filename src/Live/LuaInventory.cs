@@ -165,15 +165,25 @@ public sealed class LuaInventory
             return false;
         }
 
-        return _lua.EvaluateBool(
-            "(function() for bag = 0, 4 do "
-            + "for slot = 1, (GetContainerNumSlots(bag) or 0) do "
-            + "local link = GetContainerItemLink(bag, slot) "
-            + "if link then "
-            + "local _, _, quality, _, _, class, _, _, _, _, price = GetItemInfo(link) "
-            + "if price and price > 0 and class ~= \"Quest\" then return true end "
-            + "end end end return false end)()");
+        return _lua.EvaluateBool(SellableScript);
     }
+
+    /// <summary>
+    /// Asks whether any occupied slot holds something a vendor would pay for.
+    /// </summary>
+    /// <remarks>
+    /// A named constant rather than an inline string so that a test can answer exactly what the
+    /// bot asks. A fixture holding its own copy would go on passing after this changed, and the
+    /// test would quietly stop testing anything.
+    /// </remarks>
+    internal const string SellableScript =
+        "(function() for bag = 0, 4 do "
+        + "for slot = 1, (GetContainerNumSlots(bag) or 0) do "
+        + "local link = GetContainerItemLink(bag, slot) "
+        + "if link then "
+        + "local _, _, quality, _, _, class, _, _, _, _, price = GetItemInfo(link) "
+        + "if price and price > 0 and class ~= \"Quest\" then return true end "
+        + "end end end return false end)()";
 
     /// <summary>Forgets the last reading, for after looting or selling.</summary>
     public void Invalidate() => _readAt = DateTimeOffset.MinValue;

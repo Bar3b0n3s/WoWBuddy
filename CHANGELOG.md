@@ -30,6 +30,10 @@ zero, anything may change.
   failing four hours in.
 - **[docs/phase-9-manual-test.md](docs/phase-9-manual-test.md)** — professions, reagents, a
   merchant's shelves, buying, and a shopping trip end to end.
+- **End-to-end tests.** The real runner over the real root tree over a real bot base against a
+  real live state, with only the client and pathfinding faked. Every defect found in this
+  project since the bot bases were written has been at a seam, and none of them was visible from
+  inside a single component.
 - **Mixing activities within a session.** A plan is a priority list of activities with
   conditions and time limits; a minimum dwell and boundary-aligned pre-emption stop a condition
   sitting on its threshold from swapping activities several times a second.

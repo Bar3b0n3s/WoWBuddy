@@ -70,6 +70,13 @@ Specifically unproven:
 what the last one proved, and reporting what you saw is the most useful thing anyone can do for
 this project right now.
 
+What the suite *does* cover, and did not until recently, is the seams. Every defect found in
+this project since the bot bases were written has been at one — an errand nothing could finish,
+a setting the window collected and the composition root never passed, a trainer errand waiting
+for a merchant's window. None of those is visible from inside any single component, so there is
+now a set of tests that runs the real runner over the real root tree over a real bot base
+against a real live state, with only the client and pathfinding faked.
+
 ### Six things the bot will not work out for itself
 
 The window asks, keeps the answer, and never guesses:
