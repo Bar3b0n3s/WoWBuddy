@@ -101,6 +101,14 @@ public static class CapabilityProbes
              "JoinBattlefield", "AcceptBattlefieldPort", "LeaveBattlefield"],
             "queueing for and leaving a battleground",
             "The battleground base cannot queue. It can still play one you joined by hand."),
+
+        // No recipe data ships with this project and none is needed: what a character can make
+        // is in its own spellbook, and the client will list it when asked.
+        new(GameCapability.TradeSkills,
+            ["GetNumTradeSkills", "GetTradeSkillInfo", "GetTradeSkillLine", "DoTradeSkill",
+             "CloseTradeSkill"],
+            "reading what the character can make, and making it",
+            "The crafting base cannot run."),
     ];
 
     /// <summary>Asks the client about every capability.</summary>

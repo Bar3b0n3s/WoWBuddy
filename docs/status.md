@@ -60,11 +60,14 @@ like progress and be worth less than nothing.
 It also means `IPlugin.Pulse` is a contract nothing calls yet. A plugin that ships a combat
 routine works today; one that does per-tick work does not.
 
-### Phase 9 was skipped
+### No crafting bot base
 
-Professions and the mixed-activity scheduler — a character that mines while questing, or
-alternates gathering and grinding on a schedule — were never built. The session scheduler
-handles time; it does not handle mixing activities.
+Phase 9 is mostly done: the activity scheduler mixes activities within a session, opportunistic
+gathering picks up nodes passed on the way, and `LuaTradeSkills` reads what a character can make
+and decides what is worth making next. See [activities.md](activities.md).
+
+What does not exist is the loop that stands at an anvil and works through a queue, or anything
+that buys materials to feed it. The decisions are written and tested; the base is not.
 
 ## Outstanding assumptions
 

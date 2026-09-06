@@ -23,7 +23,7 @@ running unattended. Both halves of that sentence matter, so this section is spec
 | 6 — Gather and Fish bases, world data | **Done** |
 | 7 — Questing base, profile schema and importer | **Done** |
 | 8 — Dungeons and battlegrounds, group play | **Done** |
-| 9 — Professions and the mixed-activity scheduler | **Not started** |
+| 9 — Professions and the mixed-activity scheduler | **Mostly done** |
 | 10 — All thirty combat routines, plugins, UI | **Done** |
 | 11 — Docs, packaging, release | **Done** |
 
@@ -96,6 +96,7 @@ scheduler, [7](docs/phase-7-manual-test.md) questing, and
 | [profiles.md](docs/profiles.md) | The profile format, and importing Honorbuddy ones |
 | [combat-routines.md](docs/combat-routines.md) | The thirty rotations and how to edit them |
 | [group-play.md](docs/group-play.md) | Parties, following, assisting, healing, battlegrounds |
+| [activities.md](docs/activities.md) | Mixing activities in a session, and professions |
 | [plugins.md](docs/plugins.md) | What a plugin can do, and why it is trusted differently |
 | [troubleshooting.md](docs/troubleshooting.md) | When something does not work |
 | [legal-and-licensing.md](docs/legal-and-licensing.md) | What may and may not be linked in |

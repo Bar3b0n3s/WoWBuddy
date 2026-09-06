@@ -8,11 +8,21 @@ zero, anything may change.
 
 ## [Unreleased]
 
+### Added
+
+- **Mixing activities within a session.** A plan is a priority list of activities with
+  conditions and time limits; a minimum dwell and boundary-aligned pre-emption stop a condition
+  sitting on its threshold from swapping activities several times a second.
+- **Opportunistic gathering.** Picking up a node passed on the way, bounded by a short detour
+  range, a cap on consecutive nodes, a rest, a per-node cooldown, and never in combat.
+- **Trade skills.** Reading what a character can make from the client's own window — no recipe
+  data ships — and choosing the highest-colour recipe there are materials for.
+
 ### Missing
 
 - The live `IBotState` adapter that would let the behaviour tree run against a real client. See
   [docs/status.md](docs/status.md).
-- Phase 9: professions and the mixed-activity scheduler.
+- A crafting bot base, and buying materials for one.
 
 ## [0.9.0] — 2026-09-06
 

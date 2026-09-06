@@ -41,6 +41,9 @@ public enum GameCapability
 
     /// <summary>Queueing for and sitting inside a battleground.</summary>
     Battlegrounds,
+
+    /// <summary>Reading what the character can make, and making it.</summary>
+    TradeSkills,
 }
 
 /// <summary>One thing to ask the client about itself.</summary>
