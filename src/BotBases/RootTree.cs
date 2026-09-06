@@ -1,6 +1,8 @@
 using WoWBuddy.Behavior;
 using WoWBuddy.Common.Geometry;
+using WoWBuddy.BotBases.Support;
 using WoWBuddy.Common.Logging;
+using WoWBuddy.Common.Scheduling;
 
 namespace WoWBuddy.BotBases;
 
@@ -28,11 +30,17 @@ public static class RootTree
     /// <summary>How close to the corpse the character has to be to reclaim it.</summary>
     public const float CorpseReclaimRange = 25f;
 
+    /// <summary>How close the character has to be to open a corpse's loot.</summary>
+    public const float LootRange = 4f;
+
     /// <summary>
     /// Builds the root tree around a bot base.
     /// </summary>
     /// <param name="botBase">The plan for what to do when nothing has gone wrong.</param>
-    public static BehaviorTree<IBotState> Build(Node<IBotState> botBase)
+    /// <param name="errands">
+    /// Decides when to break off for a vendor, repair or trainer. Omit to disable errands.
+    /// </param>
+    public static BehaviorTree<IBotState> Build(Node<IBotState> botBase, ErrandPlanner? errands = null)
     {
         ArgumentNullException.ThrowIfNull(botBase);
 
@@ -47,7 +55,30 @@ public static class RootTree
 
                 HandleDeath(),
                 HandleCombat(),
+
+                // A break means stop playing, not stop existing. It sits below death and
+                // combat deliberately: a character that spends a ten-minute break lying dead
+                // resumes to a corpse run it could have done already, and one that stands
+                // still while something eats it is not taking a break, it is dying. Below
+                // this line is everything a person on a break would not be doing: looting,
+                // eating, running errands, looking for the next fight.
+                new If<IBotState>(
+                    s => s.Session == SessionState.OnBreak,
+                    new Do<IBotState>(s =>
+                    {
+                        s.StopMoving();
+                        return RunStatus.Running;
+                    })
+                    { Name = "Take a break" })
+                { Name = "On a break" },
+
+                // Looting comes after combat and before resting: the corpse can be looted
+                // while the character is still hurt, and waiting until after a two-minute
+                // drink risks the corpse expiring.
+                HandleLooting(),
+
                 HandleRest(),
+                HandleErrands(errands),
 
                 new If<IBotState>(_ => true, botBase) { Name = "Bot base" },
 
@@ -55,6 +86,76 @@ public static class RootTree
             {
                 Name = "Root",
             });
+    }
+
+    /// <summary>
+    /// Emptying corpses the character has killed.
+    /// </summary>
+    /// <remarks>
+    /// Below combat so that being attacked interrupts looting, and above resting because a
+    /// corpse expires on a timer whereas the character's health does not.
+    /// </remarks>
+    public static Node<IBotState> HandleLooting() =>
+        new If<IBotState>(
+            s => !s.IsInCombat && (s.IsLooting || s.LootableCorpses.Count > 0),
+            new PrioritySelector<IBotState>(
+                new If<IBotState>(
+                    s => s.IsLooting,
+                    new Do<IBotState>(_ => RunStatus.Running) { Name = "Finish looting" }),
+
+                new Do<IBotState>(s =>
+                {
+                    CandidateTarget corpse = s.LootableCorpses[0];
+
+                    // Walk to it first: looting has a range and the corpse is wherever the
+                    // fight ended, which is rarely where the character is standing.
+                    if (corpse.Distance > LootRange)
+                    {
+                        return s.MoveTo(corpse.Position) ? RunStatus.Running : RunStatus.Failure;
+                    }
+
+                    s.StopMoving();
+                    return s.Loot(corpse.Guid) ? RunStatus.Running : RunStatus.Failure;
+                })
+                { Name = "Loot the nearest corpse" })
+            { Name = "Looting" })
+        { Name = "Handle looting" };
+
+    /// <summary>
+    /// Breaking off to visit a vendor, a repair NPC, a mailbox or a trainer.
+    /// </summary>
+    /// <remarks>
+    /// Below resting because an errand is a several-minute trip and a character that leaves
+    /// at low health arrives dead. Above the bot base because carrying on grinding with full
+    /// bags and broken gear accomplishes nothing.
+    /// </remarks>
+    public static Node<IBotState> HandleErrands(ErrandPlanner? errands)
+    {
+        if (errands is null)
+        {
+            return new Check<IBotState>(_ => false) { Name = "Errands disabled" };
+        }
+
+        return new If<IBotState>(
+            s => !s.IsInCombat
+                 && (s.CurrentErrand != Errand.None
+                     || errands.Next(s.Inventory, s.Level, hasSellableItems: true) != Errand.None),
+            new Do<IBotState>(s =>
+            {
+                if (s.CurrentErrand != Errand.None)
+                {
+                    return RunStatus.Running;
+                }
+
+                Errand due = errands.Next(s.Inventory, s.Level, hasSellableItems: true);
+
+                // The bot may simply not know where to go, which is the normal state until a
+                // profile supplies vendor locations. Failing hands control back to the bot
+                // base rather than stalling.
+                return s.BeginErrand(due) ? RunStatus.Running : RunStatus.Failure;
+            })
+            { Name = "Run an errand" })
+        { Name = "Handle errands" };
     }
 
     /// <summary>

@@ -1,6 +1,8 @@
 using WoWBuddy.Behavior;
 using WoWBuddy.BotBases;
+using WoWBuddy.BotBases.Support;
 using WoWBuddy.CombatRoutines;
+using WoWBuddy.Common.Scheduling;
 using WoWBuddy.Common.Geometry;
 using WoWBuddy.Core.Objects;
 using WoWBuddy.GameApi.Enums;
@@ -178,6 +180,53 @@ public sealed class FakeBotState : IBotState
     {
         Actions.Add("StartResting");
         return true;
+    }
+
+    public int Level { get; set; } = 70;
+
+    public InventoryState Inventory { get; set; } = new(16, 16, 100d, 100_000);
+
+    public SessionState Session { get; set; } = SessionState.Running;
+
+    public IReadOnlyList<CandidateTarget> LootableCorpses { get; set; } = [];
+
+    public bool IsLooting { get; set; }
+
+    public Errand CurrentErrand { get; set; } = Errand.None;
+
+    /// <summary>When false, BeginErrand reports the bot does not know where to go.</summary>
+    public bool KnowsWhereErrandsAre { get; set; } = true;
+
+    public bool Loot(WoWGuid guid)
+    {
+        Actions.Add($"Loot({guid})");
+        IsLooting = true;
+        return true;
+    }
+
+    public bool BeginErrand(Errand errand)
+    {
+        Actions.Add($"BeginErrand({errand})");
+
+        if (!KnowsWhereErrandsAre)
+        {
+            return false;
+        }
+
+        CurrentErrand = errand;
+        return true;
+    }
+
+    /// <summary>Places a lootable corpse nearby.</summary>
+    public CandidateTarget AddCorpse(ulong guid, float distance = 3f)
+    {
+        var corpse = new CandidateTarget(
+            new WoWGuid(guid | ((ulong)WoWGuidType.Creature << 48)),
+            new Vector3(Position.X + distance, Position.Y, Position.Z),
+            distance, 70, 0d, IsAlive: false, IsInCombat: false, IsTargetingMe: false, 299);
+
+        LootableCorpses = [.. LootableCorpses, corpse];
+        return corpse;
     }
 
     /// <summary>Places a candidate enemy nearby.</summary>

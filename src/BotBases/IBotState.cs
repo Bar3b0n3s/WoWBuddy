@@ -1,6 +1,8 @@
 using WoWBuddy.Behavior;
 using WoWBuddy.Common.Geometry;
 using WoWBuddy.CombatRoutines;
+using WoWBuddy.BotBases.Support;
+using WoWBuddy.Common.Scheduling;
 using WoWBuddy.Core.Objects;
 
 namespace WoWBuddy.BotBases;
@@ -110,4 +112,37 @@ public interface IBotState
 
     /// <summary>Sits down to eat or drink. False when there is nothing to consume.</summary>
     bool StartResting();
+
+    // ---- Added in phase 5 -------------------------------------------------------------
+
+    /// <summary>The character's level.</summary>
+    int Level { get; }
+
+    /// <summary>Bag space, durability and money.</summary>
+    InventoryState Inventory { get; }
+
+    /// <summary>What the scheduler thinks the bot should be doing.</summary>
+    SessionState Session { get; }
+
+    /// <summary>Corpses in range that still have loot on them, nearest first.</summary>
+    IReadOnlyList<CandidateTarget> LootableCorpses { get; }
+
+    /// <summary>Loots the given corpse. False when it could not be reached or opened.</summary>
+    bool Loot(WoWGuid guid);
+
+    /// <summary>True while a loot window is open and being worked through.</summary>
+    bool IsLooting { get; }
+
+    /// <summary>The errand the bot is currently running, if any.</summary>
+    Errand CurrentErrand { get; }
+
+    /// <summary>
+    /// Starts an errand. False when the bot does not know where to go for it.
+    /// </summary>
+    /// <remarks>
+    /// Returning false is the normal case before profiles exist: the bot has no idea where
+    /// the nearest vendor is until a profile tells it. The tree treats that as "cannot do
+    /// this errand" rather than as an error.
+    /// </remarks>
+    bool BeginErrand(Errand errand);
 }

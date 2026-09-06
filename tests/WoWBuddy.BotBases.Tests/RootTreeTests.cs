@@ -1,6 +1,8 @@
 using WoWBuddy.Behavior;
 using WoWBuddy.BotBases;
+using WoWBuddy.BotBases.Support;
 using WoWBuddy.Common.Geometry;
+using WoWBuddy.Common.Scheduling;
 using Xunit;
 
 namespace WoWBuddy.BotBases.Tests;
@@ -189,5 +191,212 @@ public sealed class RootTreeTests
         tree.Tick(state);
 
         Assert.Contains("ReleaseCorpse", state.Actions);
+    }
+}
+
+/// <summary>
+/// Covers the branches added in phase 5 and where they sit relative to the others.
+/// </summary>
+public sealed class RootTreeSupportTests
+{
+    /// <summary>A stand-in bot base that records whether it was reached.</summary>
+    private sealed class Marker : Node<IBotState>
+    {
+        public int Ticks { get; private set; }
+
+        protected override RunStatus OnTick(IBotState context)
+        {
+            Ticks++;
+            return RunStatus.Running;
+        }
+    }
+
+    private static (BehaviorTree<IBotState> Tree, Marker Base) Build(ErrandPlanner? errands = null)
+    {
+        var marker = new Marker();
+        return (RootTree.Build(marker, errands), marker);
+    }
+
+    [Fact]
+    public void ABreakStopsTheCharacterAndSuspendsEverythingElse()
+    {
+        (BehaviorTree<IBotState> tree, Marker botBase) = Build();
+        var state = new FakeBotState { Session = SessionState.OnBreak, IsMoving = true };
+        state.AddEnemy(1);
+
+        Assert.Equal(RunStatus.Running, tree.Tick(state));
+        Assert.Contains("StopMoving", state.Actions);
+        Assert.Equal(0, botBase.Ticks);
+    }
+
+    [Fact]
+    public void ACharacterStillRecoversFromDeathDuringABreak()
+    {
+        // Spending a ten-minute break lying dead just means resuming to a corpse run that
+        // could have been done already.
+        (BehaviorTree<IBotState> tree, _) = Build();
+        var state = new FakeBotState { Session = SessionState.OnBreak, IsDead = true };
+
+        tree.Tick(state);
+
+        Assert.Contains("ReleaseCorpse", state.Actions);
+    }
+
+    [Fact]
+    public void ACharacterStillDefendsItselfDuringABreak()
+    {
+        // Standing still while something eats you is not a break, it is dying.
+        (BehaviorTree<IBotState> tree, _) = Build();
+        var state = new FakeBotState { Session = SessionState.OnBreak, IsInCombat = true };
+        state.Target = state.AddEnemy(1, targetingMe: true);
+
+        tree.Tick(state);
+
+        Assert.Contains("Combat", state.RecordingRoutine.Calls);
+    }
+
+    [Fact]
+    public void ABreakStopsTheBotStartingAnythingNew()
+    {
+        // Below the break: looting, eating, errands, looking for the next fight.
+        (BehaviorTree<IBotState> tree, Marker botBase) = Build();
+        var state = new FakeBotState { Session = SessionState.OnBreak };
+        state.AddCorpse(5, distance: 2f);
+        state.RecordingRoutine.Ready = false;
+
+        tree.Tick(state);
+
+        Assert.DoesNotContain(state.Actions, a => a.StartsWith("Loot(", StringComparison.Ordinal));
+        Assert.DoesNotContain("Rest", state.RecordingRoutine.Calls);
+        Assert.Equal(0, botBase.Ticks);
+    }
+
+    [Fact]
+    public void CorpsesAreLootedOnceTheFightIsOver()
+    {
+        (BehaviorTree<IBotState> tree, Marker botBase) = Build();
+        var state = new FakeBotState();
+        CandidateTarget corpse = state.AddCorpse(5, distance: 2f);
+
+        Assert.Equal(RunStatus.Running, tree.Tick(state));
+        Assert.Contains($"Loot({corpse.Guid})", state.Actions);
+        Assert.Equal(0, botBase.Ticks);
+    }
+
+    [Fact]
+    public void TheCharacterWalksToACorpseOutOfLootRange()
+    {
+        (BehaviorTree<IBotState> tree, _) = Build();
+        var state = new FakeBotState();
+        state.AddCorpse(5, distance: 20f);
+
+        tree.Tick(state);
+
+        Assert.Contains("MoveTo", state.Actions);
+        Assert.DoesNotContain(state.Actions, a => a.StartsWith("Loot(", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void LootingIsInterruptedByBeingAttacked()
+    {
+        (BehaviorTree<IBotState> tree, _) = Build();
+        var state = new FakeBotState { IsInCombat = true };
+        state.AddCorpse(5, distance: 2f);
+        state.Target = state.AddEnemy(1);
+
+        tree.Tick(state);
+
+        Assert.DoesNotContain(state.Actions, a => a.StartsWith("Loot(", StringComparison.Ordinal));
+        Assert.Contains("Combat", state.RecordingRoutine.Calls);
+    }
+
+    [Fact]
+    public void LootingHappensBeforeRestingBecauseCorpsesExpire()
+    {
+        // The character's health does not expire on a timer; the corpse does.
+        (BehaviorTree<IBotState> tree, _) = Build();
+        var state = new FakeBotState();
+        state.RecordingRoutine.Ready = false;
+        state.RecordingRoutine.RestTicksRemaining = 5;
+        CandidateTarget corpse = state.AddCorpse(5, distance: 2f);
+
+        tree.Tick(state);
+
+        Assert.Contains($"Loot({corpse.Guid})", state.Actions);
+        Assert.DoesNotContain("Rest", state.RecordingRoutine.Calls);
+    }
+
+    [Fact]
+    public void AnErrandIsRunWhenOneIsDue()
+    {
+        var planner = new ErrandPlanner(new ErrandSettings { TrainingEnabled = false });
+        (BehaviorTree<IBotState> tree, Marker botBase) = Build(planner);
+        var state = new FakeBotState { Inventory = new InventoryState(0, 16, 20d, 100_000) };
+
+        Assert.Equal(RunStatus.Running, tree.Tick(state));
+        Assert.Contains($"BeginErrand({Errand.Repair})", state.Actions);
+        Assert.Equal(0, botBase.Ticks);
+    }
+
+    [Fact]
+    public void TheBotCarriesOnWhenItDoesNotKnowWhereToRunAnErrand()
+    {
+        // The normal state before profiles supply vendor locations. Stalling here would stop
+        // the bot doing anything at all.
+        var planner = new ErrandPlanner(new ErrandSettings { TrainingEnabled = false });
+        (BehaviorTree<IBotState> tree, Marker botBase) = Build(planner);
+        var state = new FakeBotState
+        {
+            Inventory = new InventoryState(0, 16, 20d, 100_000),
+            KnowsWhereErrandsAre = false,
+        };
+
+        tree.Tick(state);
+
+        Assert.Equal(1, botBase.Ticks);
+    }
+
+    [Fact]
+    public void ErrandsDoNotInterruptAFight()
+    {
+        var planner = new ErrandPlanner(new ErrandSettings { TrainingEnabled = false });
+        (BehaviorTree<IBotState> tree, _) = Build(planner);
+        var state = new FakeBotState
+        {
+            IsInCombat = true,
+            Inventory = new InventoryState(0, 16, 5d, 100_000),
+        };
+        state.Target = state.AddEnemy(1);
+
+        tree.Tick(state);
+
+        Assert.DoesNotContain(state.Actions, a => a.StartsWith("BeginErrand", StringComparison.Ordinal));
+        Assert.Contains("Combat", state.RecordingRoutine.Calls);
+    }
+
+    [Fact]
+    public void RestingHappensBeforeAnErrandSoTheCharacterDoesNotArriveDead()
+    {
+        var planner = new ErrandPlanner(new ErrandSettings { TrainingEnabled = false });
+        (BehaviorTree<IBotState> tree, _) = Build(planner);
+        var state = new FakeBotState { Inventory = new InventoryState(0, 16, 20d, 100_000) };
+        state.RecordingRoutine.Ready = false;
+        state.RecordingRoutine.RestTicksRemaining = 5;
+
+        tree.Tick(state);
+
+        Assert.Contains("Rest", state.RecordingRoutine.Calls);
+        Assert.DoesNotContain(state.Actions, a => a.StartsWith("BeginErrand", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ErrandsAreSkippedEntirelyWhenNoPlannerIsSupplied()
+    {
+        (BehaviorTree<IBotState> tree, Marker botBase) = Build(errands: null);
+        var state = new FakeBotState { Inventory = new InventoryState(0, 16, 1d, 100_000) };
+
+        tree.Tick(state);
+
+        Assert.Equal(1, botBase.Ticks);
     }
 }

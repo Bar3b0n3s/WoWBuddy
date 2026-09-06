@@ -18,8 +18,9 @@ The delivery plan runs to eleven phases. Three are done.
 | 2 — Execute: game-thread hook, Lua bridge, native calls, Lua console | **Done** |
 | 3 — Move: navigation meshes, path following, stuck handling | **Done** |
 | 4 — Fight: behaviour trees, four combat routines, grind bot base | **Done** |
-| 5 — Live: loot, vendor, repair, mail, trainer, gear, scheduler | Next |
-| 6-11 — Gather, quest, dungeons, professions, plugins, release | Not started |
+| 5 — Live: loot, gear, errand planning, scheduler, humanization | **Done** |
+| 6 — Gather and Fish bot bases | Next |
+| 7-11 — Questing, dungeons, professions, plugins, release | Not started |
 
 **What works today.** Find a running 12340 client, attach, verify the offset table against
 that specific client, and walk the object manager to read the local player and everything
@@ -31,8 +32,10 @@ TrinityCore or AzerothCore**, whose formats differ — find paths through them, 
 character along one with stuck detection and recovery.
 
 On top of that sits a behaviour tree, four combat routines (Fury Warrior, Frost Mage, Holy
-Priest, Beast Mastery Hunter) and a grind bot base: pick a target, close, pull, fight, rest,
-and recover from dying.
+Priest, Beast Mastery Hunter) and a grind bot base: pick a target, close, pull, fight, loot,
+rest, and recover from dying. A scheduler runs sessions with randomised breaks and stop
+conditions, and loot rules, gear evaluation and errand planning decide what to keep, what to
+wear and when to go to town.
 
 **What does not.** No *native* cast function is used: the two published addresses for it
 disagree and neither has been confirmed. Casting goes through the client's own script entry
@@ -58,8 +61,10 @@ See [docs/setup.md](docs/setup.md), then work through
 client, and [docs/phase-2-manual-test.md](docs/phase-2-manual-test.md) before letting
 anything run inside it. For movement, [docs/navigation-data.md](docs/navigation-data.md)
 covers extracting navigation data and [docs/phase-3-manual-test.md](docs/phase-3-manual-test.md)
-covers confirming click-to-move before anything writes to it, and
-[docs/phase-4-manual-test.md](docs/phase-4-manual-test.md) covers combat.
+covers confirming click-to-move before anything writes to it,
+[docs/phase-4-manual-test.md](docs/phase-4-manual-test.md) covers combat, and
+[docs/phase-5-manual-test.md](docs/phase-5-manual-test.md) covers looting, gear and the
+scheduler.
 
 ## How this project handles low-level facts
 
