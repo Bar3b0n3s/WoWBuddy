@@ -263,60 +263,134 @@ public static class Offsets335a
     }
 
     /// <summary>
-    /// Addresses needed from phase 2 onward. Recorded here now, with their provenance, so
-    /// that the later phases start from evidence rather than from memory.
+    /// Functions and addresses used to run code on the client's own game thread.
     /// </summary>
     /// <remarks>
-    /// None of these are used yet. They are listed because the same two sources that supplied
-    /// the phase 1 anchors also supplied these, and capturing the corroboration while it is in
-    /// hand is cheaper than re-deriving it later.
+    /// <para>
+    /// Everything here is <b>written to or executed inside</b> the client, which makes a wrong
+    /// value far more expensive than in phase 1: a bad read reports nonsense, a bad call
+    /// crashes somebody's game. The single-sourced entries are therefore all covered by the
+    /// attach-time self-test in <c>ExecutionSelfTest</c>, which proves the whole chain end to
+    /// end before any of them is used for real work.
+    /// </para>
     /// </remarks>
-    public static class FutureUse
+    public static class Execution
     {
         /// <summary>
-        /// <c>FrameScript_Execute(const char* code, const char* source, int unused)</c>.
-        /// The unprotected Lua entry point. Phase 2.
+        /// <c>FrameScript_Execute(const char* code, const char* source, int unused)</c>, cdecl.
+        /// The client's unprotected Lua entry point.
         /// </summary>
+        /// <remarks>
+        /// Callers push three arguments and clean up twelve bytes. The <c>source</c> argument
+        /// is only used for error messages, so passing the code pointer for both is harmless
+        /// and saves an allocation in the client.
+        /// </remarks>
         [OffsetInfo(
             OffsetConfidence.Corroborated,
-            "Sources A and B agree (A names it FRAMESCRIPT_EXECUTE, B names it luaDoString).",
-            HowToVerify = "Phase 2: call it with a harmless script such as a DEFAULT_CHAT_FRAME message and confirm the message appears in-game.")]
+            "Sources A and B agree (A names it FRAMESCRIPT_EXECUTE, B names it luaDoString). Both call it cdecl with three arguments.",
+            HowToVerify = "The attach self-test runs a script with a known answer and reads the result back. A wrong address fails that outright.")]
         public const uint FrameScriptExecute = 0x00819210;
 
-        /// <summary>First hop of the Direct3D device pointer chain. Phase 2 EndScene hook.</summary>
+        /// <summary>
+        /// <c>ClntObjMgrGetActivePlayerObj()</c>, cdecl, no arguments. Returns the local
+        /// player object, which <see cref="GetLocalizedText"/> needs as its <c>this</c>.
+        /// </summary>
+        [OffsetInfo(
+            OffsetConfidence.SingleSource,
+            "Source B only.",
+            HowToVerify = "Its return value must equal the local player object address the object manager walk finds independently. The self-test asserts exactly that.")]
+        public const uint GetActivePlayerObject = 0x004038F0;
+
+        /// <summary>
+        /// <c>GetLocalizedText(this, const char* globalName, int index)</c>, thiscall with the
+        /// active player object in ecx and callee stack cleanup. Returns a <c>char*</c> to the
+        /// value of a Lua global.
+        /// </summary>
+        /// <remarks>
+        /// This is how return values come back from Lua: run a script that assigns a global,
+        /// then read the global. The index argument is passed as -1 by every caller observed.
+        /// </remarks>
+        [OffsetInfo(
+            OffsetConfidence.SingleSource,
+            "Source B only, which calls it as thiscall with the active player object in ecx, arguments (name, -1), and no caller stack cleanup.",
+            HowToVerify = "The attach self-test assigns a known string to a global from Lua and reads it back through this function. Nothing else in the bot uses it until that passes.")]
+        public const uint GetLocalizedText = 0x007225E0;
+
+        /// <summary>
+        /// <c>CGGameUI::Target(uint guidLow, uint guidHigh)</c>, cdecl with eight bytes of
+        /// caller stack cleanup. Sets the player's current target.
+        /// </summary>
+        /// <remarks>
+        /// The native equivalent of the protected Lua <c>TargetUnit</c>. Calling it from the
+        /// game thread sidesteps the taint system entirely, because taint guards the Lua
+        /// sandbox rather than the C functions underneath it.
+        /// </remarks>
+        [OffsetInfo(
+            OffsetConfidence.SingleSource,
+            "Source B only, which pushes the GUID as two dwords, high first, and cleans up eight bytes.",
+            HowToVerify = "Call it with a known unit's GUID and confirm the local player's UNIT_FIELD_TARGET descriptor changes to match. NativeFunctions.TargetSelfTest does this on demand.")]
+        public const uint GameUiTarget = 0x00524BF0;
+
+        /// <summary>First hop of the Direct3D device pointer chain.</summary>
+        /// <remarks>
+        /// The full chain is <c>[[[D3DDevicePointer1] + D3DDevicePointer2]]</c>, which lands on
+        /// the device's vtable; <see cref="D3DEndSceneVTableOffset"/> then selects EndScene.
+        /// </remarks>
         [OffsetInfo(OffsetConfidence.Corroborated, "Sources A and B agree.",
-            HowToVerify = "Phase 2: the resolved vtable entry must lie inside d3d9.dll's address range.")]
+            HowToVerify = "The resolved EndScene pointer must lie inside d3d9.dll's loaded address range. EndSceneHook refuses to install if it does not.")]
         public const uint D3DDevicePointer1 = 0x00C5DF88;
 
         /// <summary>Second hop of the Direct3D device pointer chain.</summary>
         [OffsetInfo(OffsetConfidence.Corroborated, "Sources A and B agree.", HowToVerify = "See D3DDevicePointer1.")]
         public const uint D3DDevicePointer2 = 0x397C;
 
-        /// <summary>Byte offset of EndScene in the device vtable (entry 42).</summary>
-        [OffsetInfo(OffsetConfidence.Corroborated, "Sources A and B agree.", HowToVerify = "See D3DDevicePointer1.")]
+        /// <summary>
+        /// Byte offset of EndScene within the <c>IDirect3DDevice9</c> vtable.
+        /// </summary>
+        /// <remarks>
+        /// EndScene is entry 42 of the interface, counting the three <c>IUnknown</c> methods
+        /// first, so 42 * 4 = 0xA8. That is derivable from the published interface definition
+        /// rather than being a client-specific discovery, which is why it is the one address
+        /// here that could be reconstructed from first principles.
+        /// </remarks>
+        [OffsetInfo(
+            OffsetConfidence.Corroborated,
+            "Sources A and B agree, and it matches the documented IDirect3DDevice9 vtable layout: EndScene is method 42, so 42 * 4 = 0xA8.",
+            HowToVerify = "See D3DDevicePointer1.")]
         public const uint D3DEndSceneVTableOffset = 0xA8;
+    }
 
-        /// <summary>Base of the click-to-move block. Phase 3 movement.</summary>
+    /// <summary>
+    /// The click-to-move block, which is how the client is told where to walk.
+    /// </summary>
+    /// <remarks>
+    /// Writing here is the accepted way to move a character: the destination and an action
+    /// code go in, and the client's own movement code takes over, producing normal server
+    /// traffic and normal animation. Used from phase 3.
+    /// </remarks>
+    public static class ClickToMove
+    {
+        /// <summary>Base of the block.</summary>
         [OffsetInfo(
             OffsetConfidence.SingleSource,
             "Source B only.",
-            HowToVerify = "Phase 3: read the block while manually right-click-moving in-game; the destination floats must match the clicked location before anything is written.")]
-        public const uint ClickToMoveBase = 0x00CA11D8;
+            HowToVerify = "Right-click-move in-game and read the block: the destination floats must match where you clicked, before anything is ever written. ClickToMoveWriter.Read exists for exactly this check.")]
+        public const uint Base = 0x00CA11D8;
 
-        /// <summary>Offset in the CTM block to the action code.</summary>
-        [OffsetInfo(OffsetConfidence.SingleSource, "Source B only.", HowToVerify = "See ClickToMoveBase.")]
-        public const uint ClickToMoveAction = 0x1C;
+        /// <summary>Offset to the action code (see <c>ClickToMoveAction</c>).</summary>
+        [OffsetInfo(OffsetConfidence.SingleSource, "Source B only.", HowToVerify = "See Base.")]
+        public const uint Action = 0x1C;
 
-        /// <summary>Offset in the CTM block to the interacted GUID.</summary>
-        [OffsetInfo(OffsetConfidence.SingleSource, "Source B only.", HowToVerify = "See ClickToMoveBase.")]
-        public const uint ClickToMoveGuid = 0x20;
+        /// <summary>Offset to the GUID being interacted with.</summary>
+        [OffsetInfo(OffsetConfidence.SingleSource, "Source B only.", HowToVerify = "See Base.")]
+        public const uint InteractGuid = 0x20;
 
-        /// <summary>Offset in the CTM block to the destination X (Y and Z follow).</summary>
-        [OffsetInfo(OffsetConfidence.SingleSource, "Source B only.", HowToVerify = "See ClickToMoveBase.")]
-        public const uint ClickToMoveDestinationX = 0x8C;
+        /// <summary>Offset to the destination X. Y and Z follow at +4 and +8.</summary>
+        [OffsetInfo(OffsetConfidence.SingleSource, "Source B only.", HowToVerify = "See Base.")]
+        public const uint DestinationX = 0x8C;
 
-        /// <summary>Offset in the CTM block to the stop distance.</summary>
-        [OffsetInfo(OffsetConfidence.SingleSource, "Source B only.", HowToVerify = "See ClickToMoveBase.")]
-        public const uint ClickToMoveDistance = 0xC;
+        /// <summary>Offset to the stop distance.</summary>
+        [OffsetInfo(OffsetConfidence.SingleSource, "Source B only.", HowToVerify = "See Base.")]
+        public const uint StopDistance = 0xC;
     }
 }

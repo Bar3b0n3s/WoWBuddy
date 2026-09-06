@@ -2,7 +2,9 @@ using System.Globalization;
 using WoWBuddy.Common.Geometry;
 using WoWBuddy.Common.Logging;
 using WoWBuddy.Core.Attach;
+using WoWBuddy.Core.Memory;
 using WoWBuddy.Core.Client;
+using WoWBuddy.Core.Execution;
 using WoWBuddy.Core.Objects;
 using WoWBuddy.Core.Offsets;
 using WoWBuddy.GameApi;
@@ -21,7 +23,12 @@ namespace WoWBuddy.Inspector;
 /// <c>docs/phase-1-manual-test.md</c>.
 /// </para>
 /// <para>
-/// Strictly read-only. Nothing here writes to the client.
+/// <para>
+/// The phase 1 commands are strictly read-only. The phase 2 commands (<c>exec</c>,
+/// <c>lua</c>) install a hook and are labelled as such in the help text, because writing
+/// code into somebody's running game is not something a tool should do without saying so.
+/// <c>ctm</c> reads the click-to-move block but never writes it.
+/// </para>
 /// </para>
 /// </remarks>
 public static class Program
@@ -40,6 +47,9 @@ public static class Program
                 "offsets" => DumpOffsets(),
                 "inspect" => Inspect(args),
                 "watch" => Watch(args),
+                "exec" => ExecSelfTest(args),
+                "lua" => LuaConsole(args),
+                "ctm" => ReadClickToMove(args),
                 "help" or "--help" or "-h" => ShowHelp(),
                 _ => ShowUnknownCommand(command),
             };
@@ -58,12 +68,20 @@ public static class Program
     private static int ShowHelp()
     {
         Console.WriteLine("""
-            WoWBuddy inspector - read-only view of an attached WoW 3.3.5a (12340) client.
+            WoWBuddy inspector - dev tool for an attached WoW 3.3.5a (12340) client.
+
+            The first group is read-only. The second installs a hook in the client.
 
               list              List running clients and whether each is supported.
               inspect [pid]     Attach, verify offsets, and dump the world once.
               watch [pid]       Attach and print the local player's state once a second.
               offsets           Print the offset provenance table as Markdown.
+
+            These install a hook in the client (phase 2). See docs/phase-2-manual-test.md:
+              exec [pid]        Install game-thread execution, run the self-tests, remove it.
+              lua [pid]         Interactive Lua console.
+              ctm [pid]         Watch the click-to-move block. Read-only.
+
               help              Show this text.
 
             With no pid, a single running supported client is used. If several are running,
@@ -206,6 +224,150 @@ public static class Program
     {
         pid = 0;
         return args.Length > 1 && int.TryParse(args[1], CultureInfo.InvariantCulture, out pid);
+    }
+
+    /// <summary>
+    /// Installs game-thread execution, reports what the self-tests found, and removes it.
+    /// </summary>
+    private static int ExecSelfTest(string[] args)
+    {
+        using GameClient? client = AttachOrReport(args);
+        if (client is null)
+        {
+            return 1;
+        }
+
+        Console.WriteLine("Installing game-thread execution. This writes a small amount of code");
+        Console.WriteLine("into the client and redirects one Direct3D vtable entry through it.");
+        Console.WriteLine();
+
+        ExecutionInstallResult result = client.EnableExecution();
+        Console.WriteLine(result.Report.ToString());
+
+        if (!result.Success)
+        {
+            Console.Error.WriteLine("Execution is not available. Nothing was left installed.");
+            return 1;
+        }
+
+        ExecutionSession session = result.Session!;
+
+        Console.WriteLine("Optional check (changes your target briefly, then puts it back):");
+        Console.WriteLine(session.Native.SelfTestTargeting(out string targeting)
+            ? $"  [Passed ] Targeting: {targeting}"
+            : $"  [Failed ] Targeting: {targeting}");
+        Console.WriteLine();
+
+        Console.WriteLine($"Calls completed on the game thread: {session.Executor.CompletedCallCount}");
+        Console.WriteLine("Removing the hook.");
+        return 0;
+    }
+
+    /// <summary>
+    /// An interactive Lua prompt against the attached client.
+    /// </summary>
+    /// <remarks>
+    /// Expressions are evaluated and printed; anything ending in a semicolon is run as a
+    /// statement. Protected functions will refuse to run from here, which is a property of
+    /// the client rather than a limitation of the console: the bot uses native calls for
+    /// anything that acts on the world.
+    /// </remarks>
+    private static int LuaConsole(string[] args)
+    {
+        using GameClient? client = AttachOrReport(args);
+        if (client is null)
+        {
+            return 1;
+        }
+
+        ExecutionInstallResult result = client.EnableExecution();
+        if (!result.Success)
+        {
+            Console.WriteLine(result.Report.ToString());
+            Console.Error.WriteLine("Cannot open a Lua console without game-thread execution.");
+            return 1;
+        }
+
+        ExecutionSession session = result.Session!;
+
+        Console.WriteLine("Lua console. Expressions are evaluated; lines ending in ';' are run as");
+        Console.WriteLine("statements. Protected functions will refuse to run. Blank line or 'exit' quits.");
+        if (!session.Lua.CanReadResults)
+        {
+            Console.WriteLine($"Results unavailable: {session.Lua.ResultsUnavailableReason}");
+        }
+
+        Console.WriteLine();
+
+        while (true)
+        {
+            Console.Write("lua> ");
+            string? line = Console.ReadLine();
+
+            if (string.IsNullOrWhiteSpace(line) || line.Trim() is "exit" or "quit")
+            {
+                return 0;
+            }
+
+            if (!session.IsUsable)
+            {
+                Console.Error.WriteLine("Game-thread execution stopped working; not sending anything further.");
+                return 1;
+            }
+
+            string input = line.Trim();
+
+            if (input.EndsWith(';'))
+            {
+                Console.WriteLine(session.Lua.Execute(input) ? "ok" : "failed");
+                continue;
+            }
+
+            string? value = session.Lua.Evaluate(input);
+            Console.WriteLine(value is null ? "(no value)" : value);
+        }
+    }
+
+    /// <summary>
+    /// Prints the click-to-move block once a second, without writing to it.
+    /// </summary>
+    /// <remarks>
+    /// The way to confirm the click-to-move offsets before phase 3 relies on them: move
+    /// normally in game and watch the destination match where you clicked.
+    /// </remarks>
+    private static int ReadClickToMove(string[] args)
+    {
+        using GameClient? client = AttachOrReport(args);
+        if (client is null)
+        {
+            return 1;
+        }
+
+        var writer = new ClickToMoveWriter((IProcessMemory)client.Memory);
+
+        Console.WriteLine($"Click-to-move block at 0x{writer.BaseAddress:X8}. Read-only.");
+        Console.WriteLine("Right-click-move in game: the destination should match where you clicked.");
+        Console.WriteLine("Press Ctrl+C to stop.");
+        Console.WriteLine();
+
+        using var stop = new ManualResetEventSlim(false);
+        Console.CancelKeyPress += (_, e) =>
+        {
+            e.Cancel = true;
+            stop.Set();
+        };
+
+        while (!stop.IsSet)
+        {
+            ClickToMoveState state = writer.Read();
+            Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                $"{DateTime.Now:HH:mm:ss}  action {state.Action,-16} dest {state.Destination}  " +
+                $"stop {state.StopDistance,5:F2}  guid {(state.InteractGuid.IsZero ? "-" : state.InteractGuid.ToString())}"));
+
+            stop.Wait(TimeSpan.FromSeconds(1));
+        }
+
+        return 0;
     }
 
     private static void PrintLocalPlayer(WoWLocalPlayer? me)

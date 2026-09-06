@@ -9,8 +9,10 @@ namespace WoWBuddy.Core.Memory;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Out-of-process reading is the whole of phase 1. Nothing is injected and nothing is
-/// written; attaching in this mode cannot destabilise the client.
+/// Reading is the whole of phase 1: nothing is written and nothing is injected, so attaching
+/// alone cannot destabilise the client. The writing half of <see cref="IProcessMemory"/> is
+/// used only by the phase 2 execution layer, and only after the offset table has been
+/// verified against this specific client.
 /// </para>
 /// <para>
 /// Failed reads are counted rather than logged individually. A bad pointer during a list
@@ -19,7 +21,7 @@ namespace WoWBuddy.Core.Memory;
 /// <see cref="FailedReadCount"/> makes that visible.
 /// </para>
 /// </remarks>
-public sealed class ProcessMemoryReader : IMemoryReader, IDisposable
+public sealed class ProcessMemoryReader : IProcessMemory, IDisposable
 {
     private readonly Process _process;
     private readonly bool _ownsProcess;
@@ -141,6 +143,109 @@ public sealed class ProcessMemoryReader : IMemoryReader, IDisposable
         {
             Interlocked.Increment(ref _failedReads);
             return false;
+        }
+
+        return true;
+    }
+
+    /// <inheritdoc />
+    public bool TryWriteBytes(nint address, ReadOnlySpan<byte> buffer)
+    {
+        if (_disposed || _handle == 0 || buffer.IsEmpty || address <= 0x1000)
+        {
+            return false;
+        }
+
+        bool ok = NativeMethods.WriteProcessMemory(
+            _handle,
+            address,
+            ref MemoryMarshal.GetReference(buffer),
+            buffer.Length,
+            out nint written);
+
+        if (!ok || written != buffer.Length)
+        {
+            Log.For<ProcessMemoryReader>().Error(
+                "Failed to write {Count} byte(s) at 0x{Address:X8} (Win32 error {Error})",
+                buffer.Length, address, Marshal.GetLastWin32Error());
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <inheritdoc />
+    public nint Allocate(int size, bool executable)
+    {
+        if (_disposed || _handle == 0 || size <= 0)
+        {
+            return 0;
+        }
+
+        int protect = executable ? NativeMethods.PageExecuteReadWrite : NativeMethods.PageReadWrite;
+
+        nint address = NativeMethods.VirtualAllocEx(
+            _handle,
+            0,
+            size,
+            NativeMethods.MemCommit | NativeMethods.MemReserve,
+            protect);
+
+        if (address == 0)
+        {
+            Log.For<ProcessMemoryReader>().Error(
+                "Failed to allocate {Size} bytes in the client (Win32 error {Error})",
+                size, Marshal.GetLastWin32Error());
+            return 0;
+        }
+
+        Log.For<ProcessMemoryReader>().Debug(
+            "Allocated {Size} bytes at 0x{Address:X8} in the client ({Protection})",
+            size, address, executable ? "RWX" : "RW");
+
+        return address;
+    }
+
+    /// <inheritdoc />
+    public bool Free(nint address)
+    {
+        if (_disposed || _handle == 0 || address == 0)
+        {
+            return false;
+        }
+
+        // MEM_RELEASE requires a size of zero and frees the whole reservation.
+        return NativeMethods.VirtualFreeEx(_handle, address, 0, NativeMethods.MemRelease);
+    }
+
+    /// <inheritdoc />
+    public bool WithWritableMemory(nint address, int size, Action action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+
+        if (_disposed || _handle == 0 || size <= 0)
+        {
+            return false;
+        }
+
+        if (!NativeMethods.VirtualProtectEx(
+                _handle, address, size, NativeMethods.PageReadWrite, out int original))
+        {
+            Log.For<ProcessMemoryReader>().Error(
+                "Could not make 0x{Address:X8} writable (Win32 error {Error})",
+                address, Marshal.GetLastWin32Error());
+            return false;
+        }
+
+        try
+        {
+            action();
+        }
+        finally
+        {
+            // Always restore, even if the action threw. Leaving a page in the client
+            // writable because of an exception on our side would be inexcusable.
+            NativeMethods.VirtualProtectEx(_handle, address, size, original, out _);
         }
 
         return true;

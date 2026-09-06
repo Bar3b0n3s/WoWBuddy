@@ -48,6 +48,17 @@ Three entries are not yet backed by evidence and are called out here rather than
 | `Offsets335a.NameCache.BucketStride` | `Unverified` | Dump the bucket array with the inspector and measure the spacing between successive node pointers. Until then the name cache is advisory: a wrong stride yields *no* name rather than a wrong one, because the node's GUID must still match. |
 | `Offsets335a.NameCache.NodeGuid` | `Unverified` | Dump 0x40 bytes at a bucket's first node and look for the local player's low GUID dword. |
 
+Two more things are deliberately absent rather than guessed. The client's `CastSpell`
+function has two conflicting published addresses (0x0080DA40 and 0x0080B210) and neither
+could be confirmed, so casting is not implemented. `Interact`, `TraceLine` and `UnitReaction`
+have no address in any reachable source; interaction will go through click-to-move in phase
+3, and line of sight is a phase 3 prerequisite that needs a real address first.
+
+The phase 2 addresses that *are* present are mostly single-sourced, and are covered by the
+attach-time self-test in `ExecutionSession`: it makes the client compute a value the bot did
+not supply and reads it back, which no wrong address can pass by accident. See
+[phase-2-manual-test.md](phase-2-manual-test.md).
+
 Game object positions are also **not implemented**: no reachable source states where a 12340
 game object stores its coordinates, so `WoWGameObject.Position` returns zero and says so,
 rather than sending a gathering bot to a fabricated location. This is a prerequisite for the
@@ -87,15 +98,18 @@ The table below is that command's output, so it cannot drift from the values the
 | `Offsets335a.ClientState.IsLoadingScreen` | `0xB6AA38` | SingleSource | Source B only. | Should be non-zero exactly while zoning. Advisory only. |
 | `Offsets335a.ClientState.MapId` | `0xAB63BC` | SingleSource | Source B only. | Compare against the known map ids: 0 Eastern Kingdoms, 1 Kalimdor, 530 Outland, 571 Northrend. The inspector prints it so it can be eyeballed against the character's actual location. |
 | `Offsets335a.ClientState.ZoneId` | `0xBD080C` | SingleSource | Source B only. | Compare with the zone shown in-game via the inspector. |
-| `Offsets335a.FutureUse.FrameScriptExecute` | `0x819210` | Corroborated | Sources A and B agree (A names it FRAMESCRIPT_EXECUTE, B names it luaDoString). | Phase 2: call it with a harmless script such as a DEFAULT_CHAT_FRAME message and confirm the message appears in-game. |
-| `Offsets335a.FutureUse.D3DDevicePointer1` | `0xC5DF88` | Corroborated | Sources A and B agree. | Phase 2: the resolved vtable entry must lie inside d3d9.dll's address range. |
-| `Offsets335a.FutureUse.D3DDevicePointer2` | `0x397C` | Corroborated | Sources A and B agree. | See D3DDevicePointer1. |
-| `Offsets335a.FutureUse.D3DEndSceneVTableOffset` | `0xA8` | Corroborated | Sources A and B agree. | See D3DDevicePointer1. |
-| `Offsets335a.FutureUse.ClickToMoveBase` | `0xCA11D8` | SingleSource | Source B only. | Phase 3: read the block while manually right-click-moving in-game; the destination floats must match the clicked location before anything is written. |
-| `Offsets335a.FutureUse.ClickToMoveAction` | `0x1C` | SingleSource | Source B only. | See ClickToMoveBase. |
-| `Offsets335a.FutureUse.ClickToMoveGuid` | `0x20` | SingleSource | Source B only. | See ClickToMoveBase. |
-| `Offsets335a.FutureUse.ClickToMoveDestinationX` | `0x8C` | SingleSource | Source B only. | See ClickToMoveBase. |
-| `Offsets335a.FutureUse.ClickToMoveDistance` | `0xC` | SingleSource | Source B only. | See ClickToMoveBase. |
+| `Offsets335a.Execution.FrameScriptExecute` | `0x819210` | Corroborated | Sources A and B agree (A names it FRAMESCRIPT_EXECUTE, B names it luaDoString). Both call it cdecl with three arguments. | The attach self-test runs a script with a known answer and reads the result back. A wrong address fails that outright. |
+| `Offsets335a.Execution.GetActivePlayerObject` | `0x4038F0` | SingleSource | Source B only. | Its return value must equal the local player object address the object manager walk finds independently. The self-test asserts exactly that. |
+| `Offsets335a.Execution.GetLocalizedText` | `0x7225E0` | SingleSource | Source B only, which calls it as thiscall with the active player object in ecx, arguments (name, -1), and no caller stack cleanup. | The attach self-test assigns a known string to a global from Lua and reads it back through this function. Nothing else in the bot uses it until that passes. |
+| `Offsets335a.Execution.GameUiTarget` | `0x524BF0` | SingleSource | Source B only, which pushes the GUID as two dwords, high first, and cleans up eight bytes. | Call it with a known unit's GUID and confirm the local player's UNIT_FIELD_TARGET descriptor changes to match. NativeFunctions.TargetSelfTest does this on demand. |
+| `Offsets335a.Execution.D3DDevicePointer1` | `0xC5DF88` | Corroborated | Sources A and B agree. | The resolved EndScene pointer must lie inside d3d9.dll's loaded address range. EndSceneHook refuses to install if it does not. |
+| `Offsets335a.Execution.D3DDevicePointer2` | `0x397C` | Corroborated | Sources A and B agree. | See D3DDevicePointer1. |
+| `Offsets335a.Execution.D3DEndSceneVTableOffset` | `0xA8` | Corroborated | Sources A and B agree, and it matches the documented IDirect3DDevice9 vtable layout: EndScene is method 42, so 42 * 4 = 0xA8. | See D3DDevicePointer1. |
+| `Offsets335a.ClickToMove.Base` | `0xCA11D8` | SingleSource | Source B only. | Right-click-move in-game and read the block: the destination floats must match where you clicked, before anything is ever written. ClickToMoveWriter.Read exists for exactly this check. |
+| `Offsets335a.ClickToMove.Action` | `0x1C` | SingleSource | Source B only. | See Base. |
+| `Offsets335a.ClickToMove.InteractGuid` | `0x20` | SingleSource | Source B only. | See Base. |
+| `Offsets335a.ClickToMove.DestinationX` | `0x8C` | SingleSource | Source B only. | See Base. |
+| `Offsets335a.ClickToMove.StopDistance` | `0xC` | SingleSource | Source B only. | See Base. |
 | `UpdateFields335a.Object.Guid` | `0x0` | ProtocolDefined | AzerothCore 3.3.5 EObjectFields; agrees with source A. | Must equal the object's inline GUID at object+0x30. Asserted at attach. |
 | `UpdateFields335a.Object.Type` | `0x2` | ProtocolDefined | AzerothCore 3.3.5 EObjectFields. | Bit 0 (Object) is set for every object. |
 | `UpdateFields335a.Object.Entry` | `0x3` | ProtocolDefined | AzerothCore 3.3.5 EObjectFields. | For a creature it matches the creature_template id on the server. |

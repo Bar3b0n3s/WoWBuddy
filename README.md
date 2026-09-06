@@ -7,24 +7,30 @@ the discontinued Honorbuddy. C# 12, .NET 8, WPF, Windows only. MIT licensed.
 > servers. Accounts get banned for it.** This project does not attempt to defeat server-side
 > anti-cheat. Using it is entirely at your own risk.
 
-## Status: phases 0 and 1 complete
+## Status: phases 0, 1 and 2 complete
 
-The delivery plan runs to eleven phases. Two are done.
+The delivery plan runs to eleven phases. Three are done.
 
 | Phase | State |
 | --- | --- |
 | 0 — Scaffold, CI, licensing, docs | **Done** |
 | 1 — Attach and read: memory, offsets, object manager, typed objects, inspector | **Done** |
-| 2 — Execute: game-thread hook, Lua, native calls | Next |
-| 3-11 — Movement, combat, bot bases, profiles, plugins, release | Not started |
+| 2 — Execute: game-thread hook, Lua bridge, native calls, Lua console | **Done** |
+| 3 — Move: nav server, path following, stuck handling, mounts | Next |
+| 4-11 — Combat, bot bases, profiles, plugins, release | Not started |
 
-**What works today.** Find a running 12340 client, attach to it, verify the offset table
-against that specific client, walk the object manager, and read the local player and every
-unit, player, item, corpse and world object around it. Read-only: nothing is written to the
-client and nothing is injected.
+**What works today.** Find a running 12340 client, attach, verify the offset table against
+that specific client, and walk the object manager to read the local player and everything
+around it. Then, optionally, install a hook on the client's render loop and run code on its
+own thread: execute Lua and read values back, and call the client's native functions.
 
-**What does not.** Anything that acts on the game. No movement, no casting, no Lua. That is
-phase 2 onward.
+**What does not.** Movement, combat, and everything built on them. Casting is deliberately
+not implemented: the two published addresses for it disagree and neither has been confirmed,
+so it waits for evidence rather than a guess.
+
+**Reading is separate from acting.** Attaching is read-only and cannot destabilise the
+client. Running code inside it is a second, explicit step (`EnableExecution`), so a user who
+only wants to inspect the object manager never has anything injected into their game.
 
 ## Try it
 
@@ -37,7 +43,8 @@ dotnet run --project tools/WoWBuddy.Inspector -c Release -- inspect
 
 See [docs/setup.md](docs/setup.md), then work through
 [docs/phase-1-manual-test.md](docs/phase-1-manual-test.md) to confirm the offsets match your
-client.
+client, and [docs/phase-2-manual-test.md](docs/phase-2-manual-test.md) before letting
+anything run inside it.
 
 ## How this project handles low-level facts
 
@@ -55,6 +62,11 @@ returns a plausible-looking number that the bot then acts on. So:
 - **Unverified things say so and fail safe.** Three values are still documented assumptions.
   They are listed in [docs/offsets.md](docs/offsets.md), and the code that uses them returns
   nothing rather than something wrong.
+- **Injected code is tested as code.** Every x86 instruction the bot generates has a golden
+  test whose expected bytes came from `objdump`, and a small interpreter in the test suite
+  executes the exact bytes that would be injected, to check the resulting program behaves as
+  intended. Installing the hook is itself gated on a self-test that makes the client compute
+  an answer the bot did not supply.
 
 ## Licensing
 
@@ -73,7 +85,8 @@ ever may.
 
 ```
 src/Common       Logging, configuration, geometry
-src/Core         Offsets, memory, process attach, object manager, verification
+src/Core         Offsets, memory, process attach, object manager, verification,
+                 game-thread execution (x86 codegen, EndScene hook, Lua bridge)
 src/GameApi      Typed model: WoWUnit, WoWPlayer, WoWGameObject
 src/UI           WPF shell
 tools/Inspector  Read-only console dev tool

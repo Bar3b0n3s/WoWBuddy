@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using WoWBuddy.Common.Logging;
 using WoWBuddy.Core.Client;
+using WoWBuddy.Core.Execution;
 using WoWBuddy.Core.Memory;
 using WoWBuddy.Core.Objects;
 using WoWBuddy.Core.Offsets;
@@ -25,14 +26,18 @@ public sealed class GameClient : IDisposable
     private readonly ProcessMemoryReader _reader;
     private bool _disposed;
 
+    private ExecutionSession? _execution;
+
     private GameClient(
         ProcessMemoryReader reader,
         ClientBuild build,
         WoWGuid localPlayerGuid,
         Offsets335a.PositionLayout positionLayout,
-        VerificationReport verification)
+        VerificationReport verification,
+        IModuleResolver modules)
     {
         _reader = reader;
+        Modules = modules;
         Build = build;
         LocalPlayerGuid = localPlayerGuid;
         PositionLayout = positionLayout;
@@ -61,6 +66,43 @@ public sealed class GameClient : IDisposable
 
     /// <summary>The raw memory reader, for the dev tools.</summary>
     public IMemoryReader Memory => _reader;
+
+    /// <summary>Module table for the attached client, snapshotted at attach.</summary>
+    public IModuleResolver Modules { get; }
+
+    /// <summary>
+    /// Game-thread execution, once <see cref="EnableExecution"/> has succeeded. Null until then.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately absent by default. Attaching is read-only and cannot destabilise the
+    /// client; enabling execution writes code into it. Nothing should get that capability
+    /// without having asked for it.
+    /// </remarks>
+    public ExecutionSession? Execution => _execution;
+
+    /// <summary>
+    /// Installs game-thread execution and proves it works against this client.
+    /// </summary>
+    /// <remarks>
+    /// Idempotent while a working session exists. A session that has broken is discarded and
+    /// reinstalled, because a broken executor never recovers on its own.
+    /// </remarks>
+    public ExecutionInstallResult EnableExecution()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_execution is { IsUsable: true } existing)
+        {
+            return ExecutionInstallResult.Succeeded(existing);
+        }
+
+        _execution?.Dispose();
+        _execution = null;
+
+        ExecutionInstallResult result = ExecutionSession.Install(_reader, Modules, Objects);
+        _execution = result.Session;
+        return result;
+    }
 
     /// <summary>Process id of the attached client.</summary>
     public int ProcessId => _reader.ProcessId;
@@ -118,7 +160,8 @@ public sealed class GameClient : IDisposable
             var objectManager = new ObjectManager(reader);
             WoWGuid localPlayerGuid = objectManager.GetLocalPlayerGuid();
 
-            var client = new GameClient(reader, build, localPlayerGuid, resolution.Layout, report);
+            var client = new GameClient(
+                reader, build, localPlayerGuid, resolution.Layout, report, new ProcessModuleResolver(process));
             Log.For<GameClient>().Information(
                 "Attached to pid {Pid} as player {Guid}", process.Id, localPlayerGuid);
             return AttachResult.Succeeded(client);
@@ -198,6 +241,11 @@ public sealed class GameClient : IDisposable
         }
 
         _disposed = true;
+
+        // Order matters: the hook must come out of the client before the process handle that
+        // owns the injected memory goes away.
+        _execution?.Dispose();
+        _execution = null;
         _reader.Dispose();
     }
 }

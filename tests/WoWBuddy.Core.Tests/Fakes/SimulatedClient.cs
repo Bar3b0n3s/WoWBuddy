@@ -18,13 +18,19 @@ namespace WoWBuddy.Core.Tests.Fakes;
 /// decoding and the verifier, rather than a parallel reimplementation of them.
 /// </para>
 /// <para>
+/// From phase 2 it also implements <see cref="IProcessMemory"/>, so the code cave, the vtable
+/// hook and the command protocol can be exercised end to end: the fake even runs the game
+/// thread, in the sense that <see cref="PumpFrame"/> does what the injected stub would do on
+/// the next rendered frame.
+/// </para>
+/// <para>
 /// What it deliberately cannot prove is that the offsets themselves are the ones the real
-/// client uses. Nothing running away from a copy of the game can prove that; that is what the
-/// attach-time verification and the manual test script in <c>docs/phase-1-manual-test.md</c>
-/// are for.
+/// client uses, or that the generated machine code does the right thing when a real CPU
+/// executes it. Nothing running away from a copy of the game can prove either; that is what
+/// the attach-time verification and the manual test scripts are for.
 /// </para>
 /// </remarks>
-public sealed class SimulatedClient : IMemoryReader
+public sealed class SimulatedClient : IProcessMemory
 {
     /// <summary>Where the fake module is loaded. The same base the real client uses.</summary>
     public const uint ImageBase = 0x00400000;
@@ -136,6 +142,57 @@ public sealed class SimulatedClient : IMemoryReader
         byte[] bytes = Encoding.UTF8.GetBytes(value);
         Write(address, bytes);
         WriteByte(address + bytes.Length, 0);
+    }
+
+    /// <summary>Addresses handed out by <see cref="Allocate"/>, with their sizes.</summary>
+    public Dictionary<nint, int> Allocations { get; } = [];
+
+    /// <summary>Ranges currently made writable by <see cref="WithWritableMemory"/>, for assertions.</summary>
+    public List<(nint Address, int Size)> ProtectionChanges { get; } = [];
+
+    /// <inheritdoc />
+    public bool TryWriteBytes(nint address, ReadOnlySpan<byte> buffer)
+    {
+        if (!IsValid || address <= 0x1000)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < buffer.Length; i++)
+        {
+            _memory[address + i] = buffer[i];
+        }
+
+        return true;
+    }
+
+    /// <inheritdoc />
+    public nint Allocate(int size, bool executable)
+    {
+        nint address = Allocate(size);
+        Allocations[address] = size;
+        return address;
+    }
+
+    /// <inheritdoc />
+    public bool Free(nint address)
+    {
+        if (!Allocations.Remove(address, out int size))
+        {
+            return false;
+        }
+
+        Unmap(address, size);
+        return true;
+    }
+
+    /// <inheritdoc />
+    public bool WithWritableMemory(nint address, int size, Action action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        ProtectionChanges.Add((address, size));
+        action();
+        return true;
     }
 
     /// <summary>Unmaps a range so that reads from it fail, as they do for a freed object.</summary>
