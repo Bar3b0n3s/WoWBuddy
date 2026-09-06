@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RootNamespace>WoWBuddy.Live</RootNamespace>
+    <AssemblyName>WoWBuddy.Live</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\BotBases\WoWBuddy.BotBases.csproj" />
+    <ProjectReference Include="..\Common\WoWBuddy.Common.csproj" />
+    <ProjectReference Include="..\Core\WoWBuddy.Core.csproj" />
+    <ProjectReference Include="..\GameApi\WoWBuddy.GameApi.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Serilog" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="WoWBuddy.Live.Tests" />
+  </ItemGroup>
+</Project>

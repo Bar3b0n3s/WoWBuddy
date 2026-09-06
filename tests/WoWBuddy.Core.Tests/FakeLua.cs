@@ -27,10 +27,21 @@ public sealed class FakeLua : ILuaEvaluator
     /// <inheritdoc />
     public string ResultsUnavailableReason { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Runs whenever the bot executes a script, so a test can make the client change.
+    /// </summary>
+    /// <remarks>
+    /// The whole point of several of these calls is that the client is different afterwards —
+    /// a quest accepted, a quest handed in — and the bot finds out by looking again. Modelling
+    /// that needs the fake to change too.
+    /// </remarks>
+    public Action<string>? OnExecute { get; set; }
+
     /// <inheritdoc />
     public bool Execute(string script)
     {
         Asked.Add($"execute: {script}");
+        OnExecute?.Invoke(script);
         return true;
     }
 
@@ -88,7 +99,7 @@ public sealed class FakeLua : ILuaEvaluator
 
         lua.With(
             "GetNumQuestLogEntries", "GetQuestLogTitle", "SelectQuestLogEntry", "GetQuestLink",
-            "GetQuestLogLeaderBoard", "AcceptQuest", "CompleteQuest", "GetQuestReward",
+            "GetQuestLogLeaderBoard", "GetNumQuestLeaderBoards", "AcceptQuest", "CompleteQuest", "GetQuestReward",
             "GetNumQuestChoices", "GetNumPartyMembers", "UnitGUID", "UnitHealth",
             "UnitHealthMax", "UnitIsUnit", "GetItemCount", "GetContainerNumSlots",
             "GetContainerItemLink", "UseItemByName", "GetBattlefieldStatus", "JoinBattlefield",

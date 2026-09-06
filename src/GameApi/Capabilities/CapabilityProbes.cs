@@ -38,7 +38,7 @@ public static class CapabilityProbes
             + "in GetQuestLogTitle, so the hyperlink is the only way to get it."),
 
         new(GameCapability.QuestObjectives,
-            ["GetQuestLogLeaderBoard"],
+            ["GetQuestLogLeaderBoard", "GetNumQuestLeaderBoards"],
             "reading how far along each objective is",
             "Objective steps fall back to watching whether the whole quest completes."),
 
