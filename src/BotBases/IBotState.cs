@@ -7,6 +7,22 @@ using WoWBuddy.Core.Objects;
 
 namespace WoWBuddy.BotBases;
 
+/// <summary>A world object the client can currently see.</summary>
+/// <param name="Guid">Its GUID, which is how it is interacted with.</param>
+/// <param name="Entry">Its template id, which is what says whether it is worth gathering.</param>
+/// <param name="Position">Where it is.</param>
+/// <param name="HasPosition">
+/// Whether the position is real. False when the game object position offset could not be
+/// worked out at attach, in which case the object can be seen but not walked to.
+/// </param>
+/// <param name="Distance">Yards from the character.</param>
+public readonly record struct VisibleObject(
+    WoWGuid Guid,
+    uint Entry,
+    Vector3 Position,
+    bool HasPosition,
+    float Distance);
+
 /// <summary>A creature the bot could decide to fight.</summary>
 /// <param name="Guid">Its GUID.</param>
 /// <param name="Position">Where it is.</param>
@@ -135,6 +151,12 @@ public interface IBotState
 
     /// <summary>The errand the bot is currently running, if any.</summary>
     Errand CurrentErrand { get; }
+
+    /// <summary>World objects the client can currently see.</summary>
+    IReadOnlyList<VisibleObject> VisibleObjects { get; }
+
+    /// <summary>Interacts with something by GUID: a node, a vendor, a mailbox.</summary>
+    bool Interact(WoWGuid guid);
 
     /// <summary>
     /// Starts an errand. False when the bot does not know where to go for it.

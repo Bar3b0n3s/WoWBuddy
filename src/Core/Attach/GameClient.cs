@@ -33,10 +33,12 @@ public sealed class GameClient : IDisposable
         ClientBuild build,
         WoWGuid localPlayerGuid,
         Offsets335a.PositionLayout positionLayout,
+        uint? gameObjectPositionOffset,
         VerificationReport verification,
         IModuleResolver modules)
     {
         _reader = reader;
+        GameObjectPositionOffset = gameObjectPositionOffset;
         Modules = modules;
         Build = build;
         LocalPlayerGuid = localPlayerGuid;
@@ -54,6 +56,17 @@ public sealed class GameClient : IDisposable
 
     /// <summary>The unit position layout resolved for this client.</summary>
     public Offsets335a.PositionLayout PositionLayout { get; }
+
+    /// <summary>
+    /// Where game objects keep their position, worked out at attach, or null when it could
+    /// not be established.
+    /// </summary>
+    /// <remarks>
+    /// Null is survivable. Reading the world, fighting and moving all work without it; only
+    /// gathering and anything else that must walk to a world object is blocked, and those
+    /// say so rather than acting on a fabricated coordinate.
+    /// </remarks>
+    public uint? GameObjectPositionOffset { get; }
 
     /// <summary>The verification report produced at attach.</summary>
     public VerificationReport Verification { get; }
@@ -160,8 +173,25 @@ public sealed class GameClient : IDisposable
             var objectManager = new ObjectManager(reader);
             WoWGuid localPlayerGuid = objectManager.GetLocalPlayerGuid();
 
+            // Game objects are resolved after units, because judging whether an object is
+            // near the player needs the player's own position to be trustworthy first.
+            GameObjectPositionResolution gameObjects = GameObjectPositionResolver.Resolve(
+                reader,
+                objectManager.EnumerateObjects(WoWObjectType.GameObject),
+                ReadLocalPlayerPosition(reader, objectManager, resolution.Layout));
+
+            if (gameObjects.Success)
+            {
+                report.Pass("Game object positions", gameObjects.Detail);
+            }
+            else
+            {
+                report.Warn("Game object positions", gameObjects.Detail);
+            }
+
             var client = new GameClient(
-                reader, build, localPlayerGuid, resolution.Layout, report, new ProcessModuleResolver(process));
+                reader, build, localPlayerGuid, resolution.Layout, gameObjects.Offset, report,
+                new ProcessModuleResolver(process));
             Log.For<GameClient>().Information(
                 "Attached to pid {Pid} as player {Guid}", process.Id, localPlayerGuid);
             return AttachResult.Succeeded(client);
@@ -171,6 +201,18 @@ public sealed class GameClient : IDisposable
             reader.Dispose();
             throw;
         }
+    }
+
+    /// <summary>Reads the local player's position through the resolved unit layout.</summary>
+    private static Common.Geometry.Vector3 ReadLocalPlayerPosition(
+        IMemoryReader reader, ObjectManager objects, Offsets335a.PositionLayout layout)
+    {
+        GameObjectRef player = objects.FindLocalPlayer();
+
+        return player.IsValid
+               && reader.TryReadVector3(player.Address + (nint)layout.PositionBlock, out var position)
+            ? position
+            : Common.Geometry.Vector3.Zero;
     }
 
     /// <summary>

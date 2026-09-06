@@ -168,7 +168,7 @@ public sealed class World
                 ? new WoWLocalPlayer(reference, layout, _client.Names)
                 : new WoWPlayer(reference, layout, _client.Names),
             WoWObjectType.Unit => new WoWUnit(reference, layout),
-            WoWObjectType.GameObject => new WoWGameObject(reference, layout),
+            WoWObjectType.GameObject => new WoWGameObject(reference, layout, _client.GameObjectPositionOffset),
             WoWObjectType.Container => new WoWContainer(reference, layout),
             WoWObjectType.Item => new WoWItem(reference, layout),
             WoWObjectType.Corpse => new WoWCorpse(reference, layout),

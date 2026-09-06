@@ -217,6 +217,14 @@ public sealed class FakeBotState : IBotState
         return true;
     }
 
+    public IReadOnlyList<VisibleObject> VisibleObjects { get; set; } = [];
+
+    public bool Interact(WoWGuid guid)
+    {
+        Actions.Add($"Interact({guid})");
+        return true;
+    }
+
     /// <summary>Places a lootable corpse nearby.</summary>
     public CandidateTarget AddCorpse(ulong guid, float distance = 3f)
     {

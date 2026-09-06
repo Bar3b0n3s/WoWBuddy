@@ -1,7 +1,6 @@
 using WoWBuddy.Behavior;
 using WoWBuddy.Common.Geometry;
 using WoWBuddy.Common.Logging;
-using WoWBuddy.Core.Objects;
 using WoWBuddy.WorldData;
 
 namespace WoWBuddy.BotBases;
@@ -9,16 +8,17 @@ namespace WoWBuddy.BotBases;
 /// <summary>What to gather and where.</summary>
 public sealed record GatherSettings
 {
-    /// <summary>Game object entries to gather. Discovered from the user's own database.</summary>
+    /// <summary>Game object entries to gather.</summary>
     /// <remarks>
-    /// No default list ships with the bot. Inventing one would be exactly the sort of
-    /// unverified fact this project refuses, and node ids differ between server databases
-    /// anyway. <c>WorldDataSet.FindTemplatesByName</c> is how a user finds them.
+    /// No default list ships with the bot: node ids differ between servers, and inventing one
+    /// would be the same kind of unverified fact this project refuses elsewhere. A profile
+    /// supplies them, or the user finds them by standing next to a node and reading what the
+    /// inspector reports.
     /// </remarks>
     public IReadOnlySet<uint> NodeEntries { get; init; } = new HashSet<uint>();
 
-    /// <summary>How far from the character to consider a node worth going to.</summary>
-    public float SearchRadius { get; init; } = 300f;
+    /// <summary>How far to go out of the way for a node the bot remembers.</summary>
+    public float RememberedNodeRange { get; init; } = 150f;
 
     /// <summary>How close the character must be to interact with a node.</summary>
     public float InteractRange { get; init; } = 4f;
@@ -28,12 +28,9 @@ public sealed record GatherSettings
     /// </summary>
     /// <remarks>
     /// Nodes respawn on a timer, and a bot that returns to one it has just emptied loops
-    /// between two points forever. This is the single most important setting here.
+    /// between two points forever. The single most important setting here.
     /// </remarks>
     public TimeSpan NodeCooldown { get; init; } = TimeSpan.FromMinutes(8);
-
-    /// <summary>Whether to fight things that attack the character rather than fleeing.</summary>
-    public bool FightBack { get; init; } = true;
 
     /// <summary>Places never to go, as a centre and a radius.</summary>
     public IReadOnlyList<(Vector3 Centre, float Radius)> Blackspots { get; init; } = [];
@@ -43,105 +40,136 @@ public sealed record GatherSettings
 }
 
 /// <summary>
-/// Walks a route collecting nodes.
+/// Walks a route collecting nodes, and learns where they are as it goes.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Node positions come from the user's exported server database rather than from the client's
-/// memory. Phase 1 could not establish where a game object keeps its position and refused to
-/// guess; the database sidesteps the question entirely, and does it better — the bot knows
-/// where every node in the zone spawns rather than only the handful currently in view.
+/// Two sources of nodes, in order of preference. What the client can see right now is the
+/// only thing that proves a node is actually there; what the bot remembers from previous laps
+/// tells it where to look when nothing is in view.
 /// </para>
 /// <para>
-/// The object manager is still needed for one thing: whether a node is actually there right
-/// now. A spawn point in the database says a node appears there, not that it has respawned
-/// since the last person emptied it.
+/// Everything it sees is written down. A first lap of a zone is slow and blind; by the third
+/// the bot knows the route, which is roughly how a person learns one. Nothing external is
+/// needed for this — no database, no downloaded node list — which matters because a person
+/// botting on somebody else's realm has access to neither.
+/// </para>
+/// <para>
+/// Nodes are only remembered when the client actually reported a position. That depends on
+/// the game object position offset being worked out at attach; when it is not, gathering
+/// reports that it cannot work rather than walking to zeroes.
 /// </para>
 /// </remarks>
 public sealed class GatherBotBase
 {
     private readonly GatherSettings _settings;
-    private readonly WorldDataSet _worldData;
-    private readonly Dictionary<uint, DateTimeOffset> _visited = [];
+    private readonly WorldMemory _memory;
+    private readonly Dictionary<ulong, DateTimeOffset> _recentlyVisited = [];
     private int _routeIndex;
 
-    public GatherBotBase(GatherSettings settings, WorldDataSet worldData)
+    public GatherBotBase(GatherSettings settings, WorldMemory memory)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
-        _worldData = worldData ?? throw new ArgumentNullException(nameof(worldData));
+        _memory = memory ?? throw new ArgumentNullException(nameof(memory));
     }
 
     /// <summary>The point on the route the bot is heading for.</summary>
     public Vector3? CurrentRoutePoint =>
         _settings.Route.Count > 0 ? _settings.Route[_routeIndex] : null;
 
-    /// <summary>Nodes visited recently and still on cooldown.</summary>
-    public int NodesOnCooldown => _visited.Count;
+    /// <summary>Nodes emptied recently and left alone for now.</summary>
+    public int NodesOnCooldown => _recentlyVisited.Count;
 
     /// <summary>
-    /// The nearest node worth going to, or null.
+    /// Writes down every gatherable node the client can currently see.
     /// </summary>
+    /// <returns>How many were new.</returns>
     /// <remarks>
-    /// A node qualifies when the database says it spawns nearby, the client currently shows a
-    /// game object of that entry, it is not blackspotted, and it has not just been emptied.
-    /// The client check is what stops the bot walking to an empty spawn point.
+    /// Called every tick while gathering. This is the whole of the learning: walk past
+    /// something once and the bot knows where it is next time.
     /// </remarks>
-    public GameObjectSpawn? SelectNode(IBotState state, IReadOnlySet<uint> visibleEntries, DateTimeOffset now)
+    public int LearnVisibleNodes(IBotState state)
     {
         ArgumentNullException.ThrowIfNull(state);
-        ArgumentNullException.ThrowIfNull(visibleEntries);
 
-        if (_settings.NodeEntries.Count == 0)
+        int learned = 0;
+
+        foreach (VisibleObject visible in state.VisibleObjects)
         {
-            return null;
+            if (!_settings.NodeEntries.Contains(visible.Entry) || !visible.HasPosition)
+            {
+                continue;
+            }
+
+            if (_memory.Remember(
+                    RememberedKind.Node, visible.Entry, state.MapId, visible.Position,
+                    name: string.Empty, state.Now))
+            {
+                learned++;
+            }
         }
+
+        return learned;
+    }
+
+    /// <summary>
+    /// The nearest node actually in view and worth gathering, or null.
+    /// </summary>
+    /// <remarks>
+    /// Only things the client can see. A remembered position says a node spawns there, not
+    /// that it has respawned since the last person emptied it.
+    /// </remarks>
+    public VisibleObject? SelectVisibleNode(IBotState state, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(state);
 
         ExpireCooldowns(now);
 
-        IReadOnlyList<GameObjectSpawn> nearby = _worldData.FindNodes(
-            state.MapId, _settings.NodeEntries, state.Position, _settings.SearchRadius);
-
-        foreach (GameObjectSpawn spawn in nearby)
-        {
-            if (_visited.ContainsKey(spawn.Guid))
-            {
-                continue;
-            }
-
-            // The database says a node spawns here; only the client knows whether one is
-            // there now.
-            if (!visibleEntries.Contains(spawn.Entry))
-            {
-                continue;
-            }
-
-            if (IsBlackspotted(spawn.Position))
-            {
-                continue;
-            }
-
-            return spawn;
-        }
-
-        return null;
+        return state.VisibleObjects
+            .Where(visible => _settings.NodeEntries.Contains(visible.Entry))
+            .Where(visible => visible.HasPosition)
+            .Where(visible => !_recentlyVisited.ContainsKey(visible.Guid.Value))
+            .Where(visible => !IsBlackspotted(visible.Position))
+            .OrderBy(visible => visible.Distance)
+            .Select(visible => (VisibleObject?)visible)
+            .FirstOrDefault();
     }
 
-    /// <summary>Records that a node has been visited, so the bot leaves it alone for a while.</summary>
-    public void NoteVisited(uint spawnGuid, DateTimeOffset now)
+    /// <summary>
+    /// A remembered node worth walking to when nothing is in view.
+    /// </summary>
+    /// <remarks>
+    /// Speculative by nature: the node may have been taken. Walking there is still better
+    /// than walking a fixed route past nothing, and if it turns out to be empty the bot
+    /// simply carries on.
+    /// </remarks>
+    public RememberedPlace? SelectRememberedNode(IBotState state, DateTimeOffset now)
     {
-        _visited[spawnGuid] = now + _settings.NodeCooldown;
-        Log.For<GatherBotBase>().Debug("Node {Guid} on cooldown until {Until:HH:mm}", spawnGuid, _visited[spawnGuid]);
+        ArgumentNullException.ThrowIfNull(state);
+
+        return _memory
+            .Nearest(RememberedKind.Node, state.MapId, state.Position, now, limit: 16)
+            .Where(place => _settings.NodeEntries.Contains(place.Entry))
+            .Where(place => place.Position.Distance(state.Position) <= _settings.RememberedNodeRange)
+            .Where(place => !IsBlackspotted(place.Position))
+            .Select(place => (RememberedPlace?)place)
+            .FirstOrDefault();
+    }
+
+    /// <summary>Records that a node has been emptied, so the bot leaves it alone for a while.</summary>
+    public void NoteGathered(ulong guid, DateTimeOffset now)
+    {
+        _recentlyVisited[guid] = now + _settings.NodeCooldown;
+        Log.For<GatherBotBase>().Debug("Node {Guid:X} left alone until {Until:HH:mm}", guid, _recentlyVisited[guid]);
     }
 
     /// <summary>Moves to the next point on the route.</summary>
     public void AdvanceRoute()
     {
-        if (_settings.Route.Count == 0)
+        if (_settings.Route.Count > 0)
         {
-            return;
+            _routeIndex = (_routeIndex + 1) % _settings.Route.Count;
         }
-
-        _routeIndex = (_routeIndex + 1) % _settings.Route.Count;
     }
 
     /// <summary>True when a position is somewhere the profile says not to go.</summary>
@@ -150,65 +178,87 @@ public sealed class GatherBotBase
 
     private void ExpireCooldowns(DateTimeOffset now)
     {
-        if (_visited.Count == 0)
+        if (_recentlyVisited.Count == 0)
         {
             return;
         }
 
-        foreach (uint guid in _visited.Where(entry => entry.Value <= now).Select(entry => entry.Key).ToList())
+        foreach (ulong guid in _recentlyVisited
+                     .Where(entry => entry.Value <= now)
+                     .Select(entry => entry.Key)
+                     .ToList())
         {
-            _visited.Remove(guid);
+            _recentlyVisited.Remove(guid);
         }
     }
 
     /// <summary>Builds the subtree the root tree runs.</summary>
-    public Node<IBotState> Build(Func<IBotState, IReadOnlySet<uint>> visibleEntries) =>
-        new PrioritySelector<IBotState>(
-            // Something attacking is dealt with by the root tree's combat branch; this only
-            // decides whether to keep gathering while it happens.
-            new If<IBotState>(
-                state => SelectNode(state, visibleEntries(state), state.Now) is not null,
-                new Do<IBotState>(state =>
-                {
-                    GameObjectSpawn node = SelectNode(state, visibleEntries(state), state.Now)!.Value;
+    public Node<IBotState> Build() =>
+        new Sequence<IBotState>(
+            // Learning happens on every tick, whatever the bot then decides to do, because
+            // the character sees things while walking past them as much as while gathering.
+            new Do<IBotState>(state =>
+            {
+                LearnVisibleNodes(state);
+                return RunStatus.Success;
+            })
+            { Name = "Note what is in view" },
 
-                    if (state.Position.Distance(node.Position) > _settings.InteractRange)
+            new PrioritySelector<IBotState>(
+                new If<IBotState>(
+                    state => SelectVisibleNode(state, state.Now) is not null,
+                    new Do<IBotState>(state =>
                     {
-                        return state.MoveTo(node.Position) ? RunStatus.Running : RunStatus.Failure;
-                    }
+                        VisibleObject node = SelectVisibleNode(state, state.Now)!.Value;
 
-                    state.StopMoving();
-                    NoteVisited(node.Guid, state.Now);
+                        if (node.Distance > _settings.InteractRange)
+                        {
+                            return state.MoveTo(node.Position) ? RunStatus.Running : RunStatus.Failure;
+                        }
 
-                    // Gathering is an interaction with the object, which the movement layer
-                    // performs by walking to it and interacting; the node is left on cooldown
-                    // either way so a failure does not loop.
-                    return RunStatus.Running;
-                })
-                { Name = "Gather the nearest node" })
-            { Name = "A node is available" },
+                        state.StopMoving();
 
-            new If<IBotState>(
-                _ => _settings.Route.Count > 0,
-                new Do<IBotState>(state =>
-                {
-                    Vector3 point = CurrentRoutePoint!.Value;
+                        // Marked as emptied whether or not the interaction succeeds, so a
+                        // node that cannot be gathered does not trap the bot in a loop.
+                        NoteGathered(node.Guid.Value, state.Now);
+                        state.Interact(node.Guid);
+                        return RunStatus.Running;
+                    })
+                    { Name = "Gather what is in view" })
+                { Name = "A node is in view" },
 
-                    if (state.Position.Distance(point) <= _settings.InteractRange * 4f)
+                new If<IBotState>(
+                    state => SelectRememberedNode(state, state.Now) is not null,
+                    new Do<IBotState>(state =>
                     {
-                        AdvanceRoute();
-                        point = CurrentRoutePoint!.Value;
-                    }
+                        RememberedPlace place = SelectRememberedNode(state, state.Now)!;
+                        return state.MoveTo(place.Position) ? RunStatus.Running : RunStatus.Failure;
+                    })
+                    { Name = "Go and look at a remembered node" })
+                { Name = "Somewhere worth checking" },
 
-                    if (state.MovementFailed)
+                new If<IBotState>(
+                    _ => _settings.Route.Count > 0,
+                    new Do<IBotState>(state =>
                     {
-                        AdvanceRoute();
-                        return RunStatus.Failure;
-                    }
+                        Vector3 point = CurrentRoutePoint!.Value;
 
-                    return state.MoveTo(point) ? RunStatus.Running : RunStatus.Failure;
-                })
-                { Name = "Walk the route" })
-            { Name = "Has a route" })
+                        if (state.Position.Distance(point) <= _settings.InteractRange * 4f)
+                        {
+                            AdvanceRoute();
+                            point = CurrentRoutePoint!.Value;
+                        }
+
+                        if (state.MovementFailed)
+                        {
+                            AdvanceRoute();
+                            return RunStatus.Failure;
+                        }
+
+                        return state.MoveTo(point) ? RunStatus.Running : RunStatus.Failure;
+                    })
+                    { Name = "Walk the route" })
+                { Name = "Has a route" })
+            { Name = "Decide" })
         { Name = "Gather" };
 }

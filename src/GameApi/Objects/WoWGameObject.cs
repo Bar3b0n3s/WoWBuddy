@@ -1,4 +1,5 @@
 using WoWBuddy.Common.Geometry;
+using WoWBuddy.Core.Memory;
 using WoWBuddy.Core.Objects;
 using WoWBuddy.Core.Offsets;
 using WoWBuddy.GameApi.Enums;
@@ -10,33 +11,42 @@ namespace WoWBuddy.GameApi.Objects;
 /// </summary>
 public sealed class WoWGameObject : WoWObject
 {
-    internal WoWGameObject(GameObjectRef reference, Offsets335a.PositionLayout positionLayout)
+    private readonly uint? _positionOffset;
+
+    internal WoWGameObject(
+        GameObjectRef reference,
+        Offsets335a.PositionLayout positionLayout,
+        uint? positionOffset)
         : base(reference, positionLayout)
     {
+        _positionOffset = positionOffset;
     }
 
     /// <summary>
-    /// Always <see cref="Vector3.Zero"/>. Game object positions are <b>not yet supported</b>.
+    /// Where the object is, or <see cref="Vector3.Zero"/> when that could not be established.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// TODO: verify. Game objects do not use the unit position block, and no source reachable
-    /// during this work states where a 12340 game object stores its coordinates. Returning
-    /// zero is deliberate: a fabricated offset here would send the gathering bot walking to
-    /// nonsense coordinates, which is exactly the failure this project is trying to avoid.
+    /// Game objects do not use the unit position block, and no source consulted for this
+    /// project states where a 12340 game object keeps its coordinates. Rather than guess, the
+    /// offset is worked out against the running client during attach — see
+    /// <c>GameObjectPositionResolver</c> — and that result is what this reads through.
     /// </para>
     /// <para>
-    /// To find it: attach the inspector to a client standing next to a known node, dump the
-    /// object's memory, and search for three consecutive floats matching the player's own
-    /// position to within a few yards. Add the result to <c>Offsets335a</c> as a candidate
-    /// and extend the attach-time resolver to confirm it the same way unit positions are
-    /// confirmed. This is a prerequisite for the phase 6 gathering base.
+    /// When resolution failed this stays zero and <see cref="HasKnownPosition"/> is false.
+    /// Callers must check rather than walking to it: a fabricated coordinate is precisely
+    /// the failure this project exists to avoid.
     /// </para>
     /// </remarks>
-    public override Vector3 Position => Vector3.Zero;
+    public override Vector3 Position =>
+        _positionOffset is { } offset
+        && Memory.TryReadVector3(Address + (nint)offset, out Vector3 position)
+        && WorldBounds.IsPlausible(position)
+            ? position
+            : Vector3.Zero;
 
-    /// <summary>True once game object positions are supported. Currently always false.</summary>
-    public bool HasKnownPosition => false;
+    /// <summary>True when this object's position is known and usable.</summary>
+    public bool HasKnownPosition => _positionOffset is not null && !Position.IsZero;
 
     /// <summary>Display (model) id, which distinguishes one node type from another.</summary>
     public uint DisplayId => Descriptors.ReadUInt32(UpdateFields335a.GameObject.DisplayId);

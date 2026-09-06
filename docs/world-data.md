@@ -1,11 +1,31 @@
-# World data from your server database
+# World data
 
-The bot needs to know where things are: where herb nodes spawn, where vendors and repair
-NPCs are. All of that already exists in the database of any 3.3.5 server, which is far better
-than having the bot wander until it stumbles across things.
+The bot needs to know where things are: where herb nodes spawn, where vendors and repair NPCs
+are. There are two ways it gets that, and **the first needs nothing from you at all**.
 
-**No data ships with this project and none ever can** — it derives from Blizzard's game files.
-You export it from your own database, the same posture as
+## The bot learns the world by playing in it
+
+Every vendor the character walks past, every mailbox, every node it gathers is written down.
+The next time an errand comes due it already knows where to go. A first lap of a zone is slow
+and blind; by the third the bot knows the route, which is roughly how a person learns one.
+
+The map lives in your settings folder, one per realm and character — a private server's world
+is not necessarily the same as another's, and sharing one file would teach the bot to walk to
+places that are not there. It is a plain JSON file you can read, edit or delete.
+
+Nothing on this page is required. Everything below is an optional shortcut for the minority
+of users who happen to have a server database.
+
+## Seeding from a server database, if you have one
+
+**Most people do not.** If you are botting on somebody else's realm you have no access to its
+database, and the bot is built on that assumption. But if you run your own server, or a local
+one for testing, you can hand the bot everything at once instead of waiting for it to learn.
+
+**No data ships with this project and none ever can.** The spawn tables derive from Blizzard's
+game files, and the databases that hold them are distributed under the GPL by TrinityCore and
+AzerothCore — the same licence that stopped this project vendoring a navigation library. So
+the export comes from your installation, the same posture as
 [navigation meshes](navigation-data.md).
 
 ## TrinityCore and AzerothCore both work, with different scripts
@@ -75,16 +95,16 @@ Two reasons. This project promises to make no network calls, and a database conn
 even to localhost. And an export is more useful: it works when the server is not running, it
 moves between machines, and it can be read in a text editor when something looks wrong.
 
-## What this unblocks
+## What actually reads a node's position
 
-| | Before | Now |
-| --- | --- | --- |
-| Gathering | Blocked: game object positions could not be read from client memory and were not guessed | Node positions come from the database |
-| Vendor, repair and trainer errands | The bot knew *that* it needed one but not *where* | Nearest service NPC by map and distance |
+Neither the learned map nor a database export removes the need to read a game object's
+position from the client: the bot has to see that a node is *there* before it gathers it, and
+a spawn point only says one appears there sometimes.
 
-The object manager is still needed for one thing gathering cannot do without: whether a node
-is actually up right now. A spawn point says a node appears there, not that it has respawned
-since the last person emptied it.
+No source consulted for this project states where a 12340 game object keeps its coordinates,
+so the offset is worked out against the running client at attach — see
+`GameObjectPositionResolver`. When that fails, gathering says so instead of walking to
+fabricated coordinates, and the attach report records it as a warning.
 
 ## Licensing
 

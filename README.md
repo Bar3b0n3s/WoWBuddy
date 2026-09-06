@@ -65,8 +65,7 @@ covers extracting navigation data and [docs/phase-3-manual-test.md](docs/phase-3
 covers confirming click-to-move before anything writes to it,
 [docs/phase-4-manual-test.md](docs/phase-4-manual-test.md) covers combat, and
 [docs/phase-5-manual-test.md](docs/phase-5-manual-test.md) covers looting, gear and the
-scheduler. [docs/world-data.md](docs/world-data.md) covers exporting node and NPC locations
-from your TrinityCore or AzerothCore database.
+scheduler. [docs/world-data.md](docs/world-data.md) covers how the bot learns where things are.
 
 ## How this project handles low-level facts
 
@@ -111,7 +110,7 @@ src/Core         Offsets, memory, process attach, object manager, verification,
                  game-thread execution (x86 codegen, EndScene hook, Lua bridge)
 src/GameApi      Typed model: WoWUnit, WoWPlayer, WoWGameObject
 src/Navigation   Navigation mesh loading, pathfinding, movement, stuck handling
-src/WorldData    Node and NPC locations exported from your own server database
+src/WorldData    The world map the bot learns by playing, and optional database seeding
 src/Behavior     Behaviour tree engine
 src/CombatRoutines  Rotation engine and per-specialisation routines
 src/BotBases     Root behaviour tree and the grind base

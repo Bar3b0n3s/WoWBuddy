@@ -1,166 +1,185 @@
 using WoWBuddy.Behavior;
 using WoWBuddy.BotBases;
 using WoWBuddy.Common.Geometry;
+using WoWBuddy.Core.Objects;
 using WoWBuddy.WorldData;
 using Xunit;
 
 namespace WoWBuddy.BotBases.Tests;
 
-public sealed class GatherBotBaseTests : IDisposable
+public sealed class GatherBotBaseTests
 {
     private static readonly DateTimeOffset Start = new(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
     private static readonly Vector3 Origin = new(-8900f, 500f, 90f);
 
-    private readonly string _directory =
-        Path.Combine(Path.GetTempPath(), "wowbuddy-gather", Guid.NewGuid().ToString("N"));
+    private static GatherSettings Settings(
+        IReadOnlyList<Vector3>? route = null,
+        IReadOnlyList<(Vector3, float)>? blackspots = null) =>
+        new()
+        {
+            NodeEntries = new HashSet<uint> { 1617 },
+            Route = route ?? [],
+            Blackspots = blackspots ?? [],
+        };
 
-    public GatherBotBaseTests()
-    {
-        Directory.CreateDirectory(_directory);
-
-        File.WriteAllText(
-            Path.Combine(_directory, WorldDataSet.FileNames.GameObjectSpawns),
-            string.Join('\n',
-                "guid\tentry\tmap\tx\ty\tz",
-                "1\t1617\t0\t-8890\t500\t90",   // 10 yards away
-                "2\t1617\t0\t-8850\t500\t90",   // 50 yards away
-                "3\t1618\t0\t-8895\t500\t90")); // a different node type
-    }
-
-    private WorldDataSet World()
-    {
-        var set = new WorldDataSet();
-        set.LoadFrom(_directory);
-        return set;
-    }
-
-    private GatherBotBase Base(GatherSettings? settings = null) =>
-        new(settings ?? new GatherSettings { NodeEntries = new HashSet<uint> { 1617 } }, World());
+    private static VisibleObject Node(ulong guid, uint entry, float distance, bool hasPosition = true) =>
+        new(new WoWGuid(guid), entry, new Vector3(Origin.X + distance, Origin.Y, Origin.Z),
+            hasPosition, distance);
 
     [Fact]
-    public void PicksTheNearestNodeThatIsActuallyThere()
+    public void WritesDownEveryGatherableNodeItWalksPast()
     {
-        // The database says where nodes spawn; only the client knows whether one is up.
-        GatherBotBase gather = Base();
-        var state = new FakeBotState { Position = Origin };
+        // The whole of the learning: see something once, know where it is next time. This is
+        // what a user with no access to a server database actually relies on.
+        var memory = new WorldMemory();
+        var gather = new GatherBotBase(Settings(), memory);
+        var state = new FakeBotState { Position = Origin, Now = Start };
+        state.VisibleObjects = [Node(1, 1617, 20f), Node(2, 9999, 10f)];
 
-        GameObjectSpawn? node = gather.SelectNode(state, new HashSet<uint> { 1617 }, Start);
+        int learned = gather.LearnVisibleNodes(state);
 
-        Assert.Equal(1u, node?.Guid);
+        Assert.Equal(1, learned);
+        Assert.Equal(1617u, memory.Places[0].Entry);
     }
 
     [Fact]
-    public void IgnoresSpawnPointsWhereNothingIsCurrentlyUp()
+    public void RefusesToLearnANodeWhosePositionIsNotKnown()
     {
-        // Walking to an empty spawn point is the classic gathering-bot failure.
-        GatherBotBase gather = Base();
-        var state = new FakeBotState { Position = Origin };
+        // When the game object position offset could not be worked out at attach, positions
+        // read as zero. Writing those down would teach the bot to walk to the map's centre.
+        var memory = new WorldMemory();
+        var gather = new GatherBotBase(Settings(), memory);
+        var state = new FakeBotState { Position = Origin, Now = Start };
+        state.VisibleObjects = [Node(1, 1617, 20f, hasPosition: false) with { Position = Vector3.Zero }];
 
-        Assert.Null(gather.SelectNode(state, new HashSet<uint>(), Start));
+        Assert.Equal(0, gather.LearnVisibleNodes(state));
+        Assert.Equal(0, memory.Count);
+    }
+
+    [Fact]
+    public void PicksTheNearestNodeActuallyInView()
+    {
+        var gather = new GatherBotBase(Settings(), new WorldMemory());
+        var state = new FakeBotState { Position = Origin, Now = Start };
+        state.VisibleObjects = [Node(1, 1617, 40f), Node(2, 1617, 10f)];
+
+        Assert.Equal(2u, gather.SelectVisibleNode(state, Start)?.Guid.Value);
     }
 
     [Fact]
     public void IgnoresNodeTypesTheProfileDoesNotWant()
     {
-        GatherBotBase gather = Base();
-        var state = new FakeBotState { Position = Origin };
+        var gather = new GatherBotBase(Settings(), new WorldMemory());
+        var state = new FakeBotState { Position = Origin, Now = Start };
+        state.VisibleObjects = [Node(1, 9999, 5f)];
 
-        GameObjectSpawn? node = gather.SelectNode(state, new HashSet<uint> { 1618 }, Start);
-
-        Assert.Null(node);
+        Assert.Null(gather.SelectVisibleNode(state, Start));
     }
 
     [Fact]
-    public void LeavesANodeAloneAfterVisitingIt()
+    public void LeavesANodeAloneAfterEmptyingIt()
     {
         // Without this the bot loops between two points forever.
-        GatherBotBase gather = Base();
-        var state = new FakeBotState { Position = Origin };
-        var visible = new HashSet<uint> { 1617 };
+        var gather = new GatherBotBase(Settings(), new WorldMemory());
+        var state = new FakeBotState { Position = Origin, Now = Start };
+        state.VisibleObjects = [Node(1, 1617, 5f)];
 
-        GameObjectSpawn first = gather.SelectNode(state, visible, Start)!.Value;
-        gather.NoteVisited(first.Guid, Start);
+        gather.NoteGathered(1, Start);
 
-        GameObjectSpawn? second = gather.SelectNode(state, visible, Start.AddSeconds(1));
-
-        Assert.NotEqual(first.Guid, second?.Guid);
-    }
-
-    [Fact]
-    public void ReturnsToANodeOnceItsCooldownHasPassed()
-    {
-        GatherBotBase gather = Base(new GatherSettings
-        {
-            NodeEntries = new HashSet<uint> { 1617 },
-            NodeCooldown = TimeSpan.FromMinutes(8),
-        });
-
-        var state = new FakeBotState { Position = Origin };
-        var visible = new HashSet<uint> { 1617 };
-
-        gather.NoteVisited(1, Start);
-        Assert.NotEqual(1u, gather.SelectNode(state, visible, Start.AddMinutes(1))?.Guid);
-        Assert.Equal(1u, gather.SelectNode(state, visible, Start.AddMinutes(10))?.Guid);
+        Assert.Null(gather.SelectVisibleNode(state, Start.AddMinutes(1)));
+        Assert.NotNull(gather.SelectVisibleNode(state, Start.AddMinutes(10)));
     }
 
     [Fact]
     public void SkipsNodesInsideABlackspot()
     {
-        GatherBotBase gather = Base(new GatherSettings
-        {
-            NodeEntries = new HashSet<uint> { 1617 },
-            Blackspots = [(new Vector3(-8890f, 500f, 90f), 20f)],
-        });
+        var gather = new GatherBotBase(
+            Settings(blackspots: [(new Vector3(Origin.X + 10f, Origin.Y, Origin.Z), 20f)]),
+            new WorldMemory());
 
-        var state = new FakeBotState { Position = Origin };
+        var state = new FakeBotState { Position = Origin, Now = Start };
+        state.VisibleObjects = [Node(1, 1617, 10f)];
 
-        Assert.Equal(2u, gather.SelectNode(state, new HashSet<uint> { 1617 }, Start)?.Guid);
+        Assert.Null(gather.SelectVisibleNode(state, Start));
     }
 
     [Fact]
-    public void GathersNothingWithoutAnyConfiguredNodeTypes()
+    public void GoesBackToARememberedNodeWhenNothingIsInView()
     {
-        // No node list ships with the bot; a profile or the user supplies it.
-        GatherBotBase gather = Base(new GatherSettings());
-        var state = new FakeBotState { Position = Origin };
+        // A remembered position says a node spawns there, not that one is up. Going to look
+        // still beats walking a fixed route past nothing.
+        var memory = new WorldMemory();
+        memory.Remember(RememberedKind.Node, 1617, 0, new Vector3(-8850f, 500f, 90f), "", Start);
 
-        Assert.Null(gather.SelectNode(state, new HashSet<uint> { 1617 }, Start));
+        var gather = new GatherBotBase(Settings(), memory);
+        var state = new FakeBotState { Position = Origin, Now = Start };
+
+        Assert.NotNull(gather.SelectRememberedNode(state, Start));
+    }
+
+    [Fact]
+    public void IgnoresRememberedNodesTooFarToBeWorthIt()
+    {
+        var memory = new WorldMemory();
+        memory.Remember(RememberedKind.Node, 1617, 0, new Vector3(-5000f, 500f, 90f), "", Start);
+
+        var gather = new GatherBotBase(Settings(), memory);
+        var state = new FakeBotState { Position = Origin, Now = Start };
+
+        Assert.Null(gather.SelectRememberedNode(state, Start));
+    }
+
+    [Fact]
+    public void GathersWhatIsInReach()
+    {
+        var gather = new GatherBotBase(Settings(), new WorldMemory());
+        Node<IBotState> tree = gather.Build();
+        var state = new FakeBotState { Position = Origin, Now = Start };
+        state.VisibleObjects = [Node(1, 1617, 2f)];
+
+        Assert.Equal(RunStatus.Running, tree.Tick(state));
+        Assert.Contains(state.Actions, a => a.StartsWith("Interact(", StringComparison.Ordinal));
     }
 
     [Fact]
     public void WalksToANodeThatIsOutOfReach()
     {
-        GatherBotBase gather = Base();
-        Node<IBotState> tree = gather.Build(_ => new HashSet<uint> { 1617 });
+        var gather = new GatherBotBase(Settings(), new WorldMemory());
+        Node<IBotState> tree = gather.Build();
         var state = new FakeBotState { Position = Origin, Now = Start };
+        state.VisibleObjects = [Node(1, 1617, 30f)];
 
         Assert.Equal(RunStatus.Running, tree.Tick(state));
         Assert.Contains("MoveTo", state.Actions);
     }
 
     [Fact]
-    public void FollowsItsRouteWhenNothingIsUp()
+    public void FollowsItsRouteWhenItKnowsOfNothingBetter()
     {
         var route = new List<Vector3> { new(-8800f, 500f, 90f), new(-8700f, 500f, 90f) };
-        GatherBotBase gather = Base(new GatherSettings
-        {
-            NodeEntries = new HashSet<uint> { 1617 },
-            Route = route,
-        });
-
-        Node<IBotState> tree = gather.Build(_ => new HashSet<uint>());
+        var gather = new GatherBotBase(Settings(route), new WorldMemory());
+        Node<IBotState> tree = gather.Build();
         var state = new FakeBotState { Position = Origin, Now = Start };
 
         Assert.Equal(RunStatus.Running, tree.Tick(state));
         Assert.Contains(route[0], state.MoveRequests);
     }
 
-    public void Dispose()
+    [Fact]
+    public void LearnsWhileWalkingTheRouteRatherThanOnlyWhileGathering()
     {
-        if (Directory.Exists(_directory))
-        {
-            Directory.Delete(_directory, recursive: true);
-        }
+        // A first lap is blind; by the third the bot knows the route.
+        var memory = new WorldMemory();
+        var gather = new GatherBotBase(
+            Settings(route: [new Vector3(-8800f, 500f, 90f)]), memory);
+
+        Node<IBotState> tree = gather.Build();
+        var state = new FakeBotState { Position = Origin, Now = Start };
+        state.VisibleObjects = [Node(1, 1617, 200f)];
+
+        tree.Tick(state);
+
+        Assert.Equal(1, memory.Count);
     }
 }
 
