@@ -21,9 +21,13 @@ zero, anything may change.
   `Objective` step that names no creature works from the quest's own requirements instead of
   killing whatever is nearest, and a `Collect` step can be finished by the bags without reading
   log text in a language the bot cannot parse. What the profile says always wins.
-- **Two more capability probes.** `Reagents` and `Buying`, listing exactly the calls the new
-  scripts make, so a client without them switches the shopping off rather than failing four
-  hours in.
+- **Learning abilities from a trainer.** `ITrainerActions` and `LuaTrainer` read what a trainer
+  will teach — filtered to what is actually available, so an index cannot point at something the
+  character already knows — and learn it. No spell data ships: the trainer already knows what
+  this character's class, level and money allow.
+- **Three more capability probes.** `Reagents`, `Buying` and `Trainer`, listing exactly the
+  calls the new scripts make, so a client without them switches those features off rather than
+  failing four hours in.
 - **[docs/phase-9-manual-test.md](docs/phase-9-manual-test.md)** — professions, reagents, a
   merchant's shelves, buying, and a shopping trip end to end.
 - **Mixing activities within a session.** A plan is a priority list of activities with
@@ -41,6 +45,13 @@ zero, anything may change.
 
 ### Fixed
 
+- **The Train errand trained nothing, and would not stop trying.** It walked to a class trainer
+  and then waited for a *merchant* window, which was never going to open, so it clicked for ten
+  seconds and gave up — and because nothing recorded the attempt, the planner decided the same
+  trip was due again on the next tick. A character past the training interval would have walked
+  to the trainer for the rest of the session instead of playing. It now opens the trainer's own
+  window, learns everything on offer it can afford in the trainer's own order, keeps money back
+  for the repair bill, and records the trip whether it worked or not.
 - **Three things the window collected and the bot never received.** The composition root built
   every bot base without the chosen group role, without the learned world map, and without the
   behaviours plugins offer — so the Dungeon base refused to start however the role was set,

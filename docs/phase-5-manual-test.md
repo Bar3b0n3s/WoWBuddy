@@ -80,15 +80,40 @@ Then deliberately fill the bags with things no vendor will buy — quest items w
 should recognise this as **wedged**: full bags with nothing sellable is a state a vendor trip
 cannot fix. It should say so rather than walking to a vendor repeatedly.
 
-## 5. Errands have nowhere to go yet
+## 5. Errands
 
-**This is expected and is the honest state of the phase.** The bot decides *that* it needs a
-vendor, a repair or a trainer. It does not know *where* any of those are: that comes from
-profiles in phase 7.
+The bot decides *that* it needs a vendor, a repair, a mailbox or a trainer. Where those are
+comes from elsewhere: a profile's `<Vendor>` and `<Mailbox>` entries for the first three, and a
+world data export for the trainer, because a profile has no way to say where a warrior trainer
+stands.
 
-So `BeginErrand` returns false, the errand branch fails, and the bot carries on grinding with
-full bags. You will see the decision in the log and no trip. Stalling instead would stop the
-bot doing anything at all, which would be worse.
+**With neither, `BeginErrand` returns false, the branch fails, and the bot carries on grinding
+with full bags.** You will see the decision in the log and no trip. That is the correct
+outcome, not a fault: stalling instead would stop the bot doing anything at all.
+
+With a profile that names a vendor, work through each errand:
+
+1. Let the bags fill. **Expect a trip, a sell, and the bags emptier.** The log names how many
+   stacks went.
+2. Let durability drop below the threshold. **Expect a repair**, and expect it to refuse and
+   walk away rather than half-repair if the character cannot afford it.
+3. With a mail recipient set, **expect one letter of up to twelve attachments**, and expect
+   quest items to stay in the bags.
+
+### Training
+
+Needs a world data export. Level the character past the training interval and:
+
+1. **Expect it to walk to a trainer of its own class** — not a profession trainer, not a mount
+   vendor, both of which wear the same trainer flag.
+2. **Expect it to learn what it can afford, cheapest rows first**, and to keep a reserve back.
+   The log names each ability and its cost.
+3. **Expect it to stop asking.** This is the check that matters: the trip is recorded whether it
+   worked or not, so the bot goes back to playing. Before that record existed the errand was
+   re-decided every quarter of a second and the character walked to the trainer for the rest of
+   the session.
+
+A trainer that teaches nothing the character can afford is a finished errand, not a failed one.
 
 ## 6. The scheduler
 
@@ -120,9 +145,8 @@ necks and cloaks are exempt because the client reports no meaningful subclass fo
 
 | Thing | Why |
 | --- | --- |
-| Actually walking to a vendor, trainer or mailbox | The bot has no idea where they are until profiles arrive in phase 7. |
-| Buying food and water | Same reason. Resting works only with what is already in the bags. |
+| Buying food and water | The bot buys crafting materials but does not stock up on consumables; resting works with what is already in the bags. |
 | Bind-on-pickup filtering | `GetItemInfo` does not report it on this client; tooltip scanning would be language-dependent. |
-| Talent assignment on level-up | Needs per-specialisation talent data, which belongs with the other 26 routines in phase 10. |
+| Talent assignment without a build | This project has no talent data. Points are spent only against a build you write; see the talents setting. |
 | Whisper alerts and pause-on-whisper | Needs chat event plumbing that no other part of the bot uses yet. |
-| Riding skill and mount purchase | Follows from trainers and vendors having locations. |
+| Riding skill and mount purchase | The bot uses a mount you already own; buying one means a mount vendor's window, which is not read. |

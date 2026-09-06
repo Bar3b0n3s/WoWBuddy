@@ -479,6 +479,7 @@ public sealed class BotController(
             new LuaBattlegrounds(lua, _capabilities!),
             new LuaInventory(lua, _capabilities!),
             new LuaVendor(lua, _capabilities!),
+            new LuaTrainer(lua, _capabilities!),
             new LuaTalents(lua, _capabilities!),
             new LuaTravel(lua, _capabilities!, () => view.IsMounted, _settings.MountName),
             new SessionScheduler(new SessionSchedule()),

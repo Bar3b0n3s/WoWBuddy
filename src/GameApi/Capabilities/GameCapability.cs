@@ -54,6 +54,9 @@ public enum GameCapability
     /// <summary>Reading a merchant's shelves and buying from them.</summary>
     Buying,
 
+    /// <summary>Learning abilities from a trainer.</summary>
+    Trainer,
+
     /// <summary>Spending talent points.</summary>
     Talents,
 

@@ -224,6 +224,9 @@ public interface IBotState
     /// <summary>Doing business with a vendor or a mailbox.</summary>
     IVendorActions Vendor { get; }
 
+    /// <summary>Learning abilities from a trainer.</summary>
+    ITrainerActions Trainer { get; }
+
     /// <summary>Spending talent points.</summary>
     ITalents Talents { get; }
 

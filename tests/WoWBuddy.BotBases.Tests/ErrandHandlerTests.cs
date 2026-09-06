@@ -266,4 +266,113 @@ public sealed class ErrandHandlerTests
 
         Assert.Equal(RunStatus.Success, new ErrandHandler(Settings()).Build().Tick(state));
     }
+
+    // ---- training ---------------------------------------------------------------------------
+
+    private const uint TrainerEntry = 5001;
+
+    private static ErrandHandlerSettings TrainingSettings(long keepBack = 10_000) => Settings() with
+    {
+        CharacterClass = 1,
+        KeepCopperWhenTraining = keepBack,
+        FindTrainer = (_, _, _) => new ProfileVendor("Warrior Trainer", TrainerEntry, 0, Town),
+    };
+
+    private static FakeBotState AtTheTrainer(long copper = 100_000)
+    {
+        FakeBotState state = new() { Position = Town, CurrentErrand = Errand.Train };
+        state.AddVisible(1, TrainerEntry, distance: 2f);
+        state.Inventory = new InventoryState(16, 16, 100d, copper);
+        state.TrainerState.IsTrainerOpen = true;
+        return state;
+    }
+
+    [Fact]
+    public void ItWaitsForTheTrainersWindowRatherThanAMerchants()
+    {
+        // The bug this pins: the errand waited for a merchant window at a trainer, which was
+        // never going to appear, so it clicked for ten seconds and gave up. Every time.
+        FakeBotState state = AtTheTrainer();
+        state.TrainerState.IsTrainerOpen = false;
+
+        Assert.Equal(RunStatus.Running, new ErrandHandler(TrainingSettings()).Build().Tick(state));
+        Assert.Contains($"Interact({state.VisibleObjects[0].Guid})", state.Actions);
+    }
+
+    [Fact]
+    public void LearnsEverythingItCanAffordAndClosesTheWindow()
+    {
+        FakeBotState state = AtTheTrainer(copper: 100_000);
+        state.TrainerState.Teaching("Heroic Strike", 5_000).Teaching("Rend", 8_000);
+
+        Assert.Equal(RunStatus.Success, new ErrandHandler(TrainingSettings()).Build().Tick(state));
+
+        Assert.Contains("Learn(Heroic Strike)", state.TrainerState.Actions);
+        Assert.Contains("Learn(Rend)", state.TrainerState.Actions);
+        Assert.Contains("CloseTrainer", state.TrainerState.Actions);
+    }
+
+    [Fact]
+    public void ItKeepsMoneyBackSoTheCharacterCanStillRepair()
+    {
+        // A trainer will take every copper the character has, and a character that cannot
+        // repair dies to things it used to beat.
+        FakeBotState state = AtTheTrainer(copper: 12_000);
+        state.TrainerState.Teaching("Heroic Strike", 5_000);
+
+        new ErrandHandler(TrainingSettings(keepBack: 10_000)).Build().Tick(state);
+
+        Assert.DoesNotContain(
+            state.TrainerState.Actions,
+            action => action.StartsWith("Learn(", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ItLearnsWhatItCanAffordAndLeavesWhatItCannot()
+    {
+        // In the trainer's own order, which is level order, so a character short of money gets
+        // the earliest things it is missing rather than one expensive rank of something.
+        FakeBotState state = AtTheTrainer(copper: 16_000);
+        state.TrainerState.Teaching("Heroic Strike", 5_000).Teaching("Rend", 50_000);
+
+        new ErrandHandler(TrainingSettings()).Build().Tick(state);
+
+        Assert.Contains("Learn(Heroic Strike)", state.TrainerState.Actions);
+        Assert.DoesNotContain("Learn(Rend)", state.TrainerState.Actions);
+    }
+
+    [Fact]
+    public void ATrainerWithNothingToTeachIsAFinishedErrandNotAFailedOne()
+    {
+        // A character that is up to date has nothing to learn, and the errand is over. Failing
+        // would be read as "could not do it", and the planner would send it back.
+        FakeBotState state = AtTheTrainer();
+
+        Assert.Equal(RunStatus.Success, new ErrandHandler(TrainingSettings()).Build().Tick(state));
+        Assert.Contains("CloseTrainer", state.TrainerState.Actions);
+    }
+
+    [Fact]
+    public void ATrainerThatRefusesIsNotAskedThirtyMoreTimes()
+    {
+        FakeBotState state = AtTheTrainer();
+        state.TrainerState.Teaching("Heroic Strike", 5_000);
+        state.TrainerState.CanLearn = false;
+
+        new ErrandHandler(TrainingSettings()).Build().Tick(state);
+
+        Assert.Single(
+            state.TrainerState.Actions,
+            action => action.StartsWith("Learn(", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void WithNoWorldDataThereIsNowhereToTrainAndItSaysSo()
+    {
+        // A profile cannot say where a warrior trainer stands, so without an export the errand
+        // is impossible rather than approximated with the nearest thing wearing a trainer flag.
+        FakeBotState state = AtTheTrainer();
+
+        Assert.Equal(RunStatus.Failure, new ErrandHandler(Settings()).Build().Tick(state));
+    }
 }

@@ -41,6 +41,14 @@ public sealed record ErrandHandlerSettings
     /// <summary>The character's class, for finding the right trainer.</summary>
     public int CharacterClass { get; init; }
 
+    /// <summary>Money to keep back when learning abilities, in copper.</summary>
+    /// <remarks>
+    /// A trainer will happily take every copper the character has, and a character with nothing
+    /// left cannot repair. Training is worth a lot; being unable to repair is worth less than
+    /// nothing.
+    /// </remarks>
+    public long KeepCopperWhenTraining { get; init; } = 10_000;
+
     /// <summary>How long to wait for a window to open before giving up on the errand.</summary>
     /// <remarks>
     /// The character can be standing at the right spot and still not have a window: the vendor
@@ -122,7 +130,7 @@ public sealed class ErrandHandler
             return Abandon();
         }
 
-        switch (_approach.Step(state, destination, wantMailbox: errand == Errand.Mail))
+        switch (_approach.Step(state, destination, WindowFor(errand)))
         {
             case ApproachResult.Travelling:
                 return RunStatus.Running;
@@ -138,9 +146,18 @@ public sealed class ErrandHandler
             Errand.Repair => DoRepair(vendor),
             Errand.Sell => DoSell(vendor),
             Errand.Mail => DoMail(vendor),
+            Errand.Train => DoTrain(state),
             _ => Abandon(),
         };
     }
+
+    /// <summary>Which window each errand is waiting for.</summary>
+    private static VendorWindow WindowFor(Errand errand) => errand switch
+    {
+        Errand.Mail => VendorWindow.Mailbox,
+        Errand.Train => VendorWindow.Trainer,
+        _ => VendorWindow.Merchant,
+    };
 
     private RunStatus DoRepair(IVendorActions vendor)
     {
@@ -222,6 +239,79 @@ public sealed class ErrandHandler
 
         vendor.Close();
         return Finish();
+    }
+
+    /// <summary>
+    /// Learns everything the trainer offers and the character can afford.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// In the trainer's own order, which is level order, so a character short of money learns
+    /// the earliest things it is missing rather than one expensive rank of something.
+    /// </para>
+    /// <para>
+    /// The list is read again after each purchase because learning one thing can reveal
+    /// another — a rank that was greyed out until its prerequisite was known — and because the
+    /// indices shift underneath a list read once.
+    /// </para>
+    /// </remarks>
+    private RunStatus DoTrain(IBotState state)
+    {
+        ITrainerActions trainer = state.Trainer;
+        long purse = state.Inventory.Copper - _settings.KeepCopperWhenTraining;
+
+        int learned = 0;
+
+        // Bounded, because "read the list again after each purchase" and "the client refused
+        // without saying so" would otherwise be a loop. Trainers do not offer this many things
+        // at one level in any case.
+        for (int attempt = 0; attempt < MaxServicesPerVisit; attempt++)
+        {
+            if (Affordable(trainer.Available, purse) is not { } service)
+            {
+                break;
+            }
+
+            if (!trainer.Learn(service))
+            {
+                break;
+            }
+
+            purse -= service.Cost;
+            learned++;
+
+            Log.For<ErrandHandler>().Information(
+                "Learned {Service} for {Cost} copper", service, service.Cost);
+        }
+
+        if (learned == 0)
+        {
+            // Not a failure. A character that is up to date, or too poor, has nothing to learn
+            // here, and the errand is over either way — which is what stops it being decided
+            // again on the next tick, and the tick after that.
+            Log.For<ErrandHandler>().Information(
+                "Nothing to learn at this trainer that the character can afford");
+        }
+
+        trainer.CloseTrainer();
+        return Finish();
+    }
+
+    /// <summary>How many things to learn in one visit before giving the tick back.</summary>
+    public const int MaxServicesPerVisit = 32;
+
+    /// <summary>The first thing on the list the character can pay for.</summary>
+    private static TrainerService? Affordable(IReadOnlyList<TrainerService> services, long purse)
+    {
+        foreach (TrainerService service in services)
+        {
+            if (service.Cost <= purse)
+            {
+                return service;
+            }
+        }
+
+        return null;
     }
 
     private RunStatus Finish()

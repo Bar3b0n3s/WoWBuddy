@@ -134,6 +134,14 @@ public static class CapabilityProbes
             "reading a merchant's shelves and buying from them",
             "The bot never buys anything, so the crafting base stops when the bags run dry."),
 
+        // No spell data ships with this project and none is needed: the trainer knows what this
+        // character's class, level and money allow, and will list exactly that.
+        new(GameCapability.Trainer,
+            ["GetNumTrainerServices", "GetTrainerServiceInfo", "GetTrainerServiceCost",
+             "BuyTrainerService", "SetTrainerServiceTypeFilter", "CloseTrainer"],
+            "learning abilities from a trainer",
+            "The Train errand walks to the trainer and comes back having learned nothing."),
+
         new(GameCapability.Talents,
             ["GetUnspentTalentPoints", "GetTalentInfo", "LearnTalent"],
             "spending talent points",

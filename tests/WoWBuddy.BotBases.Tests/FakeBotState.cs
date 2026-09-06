@@ -231,6 +231,11 @@ public sealed class FakeBotState : IBotState
 
     public IVendorActions Vendor => VendorState;
 
+    /// <summary>The trainer the character is standing at.</summary>
+    public FakeTrainer TrainerState { get; } = new();
+
+    public ITrainerActions Trainer => TrainerState;
+
     public void EndErrand()
     {
         Actions.Add($"EndErrand({CurrentErrand})");

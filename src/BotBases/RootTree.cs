@@ -208,6 +208,7 @@ public static class RootTree
                     }
                 }
 
+                Errand ran = s.CurrentErrand;
                 RunStatus status = errandHandler.Tick(s);
 
                 if (status == RunStatus.Running)
@@ -218,6 +219,17 @@ public static class RootTree
                 // Done, or given up on. Either way the errand is over: an errand that stayed
                 // current after its handler stopped working on it would hold the bot forever.
                 s.EndErrand();
+
+                if (ran == Errand.Train)
+                {
+                    // Recorded whether it worked or not, and that is the point. The planner
+                    // decides a training trip is due from the character's level alone, so an
+                    // errand that ends without this is decided again on the very next tick —
+                    // and the bot walks to the trainer for the rest of the session instead of
+                    // playing. A trainer that could not be reached is worth one attempt per
+                    // few levels, not one per quarter second.
+                    errands.NoteTrained(s.Level);
+                }
 
                 // Failure rather than success, so the bot base gets this tick instead of the
                 // character standing still until the next one.

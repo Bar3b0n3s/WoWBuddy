@@ -388,6 +388,53 @@ public sealed class RootTreeSupportTests
     }
 
     [Fact]
+    public void ATrainingTripIsRecordedSoItIsNotDecidedAgainOnTheNextTick()
+    {
+        // The livelock this replaced: the planner decides a training trip is due from the
+        // character's level alone, so an errand that ended without recording it was decided
+        // again a quarter of a second later, and the bot walked to the trainer for the rest of
+        // the session instead of playing.
+        var planner = new ErrandPlanner(new ErrandSettings
+        {
+            TrainingEnabled = true,
+            TrainEveryLevels = 2,
+        });
+
+        (BehaviorTree<IBotState> tree, Marker botBase) = Build(planner, new Handler(RunStatus.Success));
+
+        // Nothing else due: full bags and good gear, so training is the only errand.
+        var state = new FakeBotState { Level = 20, Inventory = new InventoryState(16, 16, 100d, 100_000) };
+
+        tree.Tick(state);
+
+        Assert.Contains($"BeginErrand({Errand.Train})", state.Actions);
+        Assert.Equal(20, planner.LastTrainedLevel);
+
+        // And the next tick plays rather than setting off for the trainer again.
+        state.Actions.Clear();
+        tree.Tick(state);
+
+        Assert.DoesNotContain($"BeginErrand({Errand.Train})", state.Actions);
+        Assert.Equal(2, botBase.Ticks);
+    }
+
+    [Fact]
+    public void ATrainingTripThatFailedIsStillRecorded()
+    {
+        // Deliberately the same as a successful one. A trainer that cannot be reached is worth
+        // one attempt every few levels, not one every tick — and telling the two apart would
+        // buy nothing, because the planner's answer is the same either way.
+        var planner = new ErrandPlanner(new ErrandSettings { TrainingEnabled = true });
+
+        (BehaviorTree<IBotState> tree, _) = Build(planner, new Handler(RunStatus.Failure));
+        var state = new FakeBotState { Level = 20, Inventory = new InventoryState(16, 16, 100d, 100_000) };
+
+        tree.Tick(state);
+
+        Assert.Equal(20, planner.LastTrainedLevel);
+    }
+
+    [Fact]
     public void ErrandsAreNotStartedWhenNothingCanCarryThemOut()
     {
         // Deciding an errand is due and having no way to run it is how the bot deadlocked.

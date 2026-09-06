@@ -125,9 +125,11 @@ the bot has misunderstood something, and a third trip would misunderstand it aga
 
 ## What is not here
 
-Taking a character to a trainer when a profession or a skill hits its cap: the bot can find a
-class trainer from world data, but the profession trainer's own window is not read, so it cannot
-tell learning a new rank from buying a recipe.
+Raising a profession past its training cap. The bot can find a trainer, and it does visit a
+*class* trainer to learn abilities — but a profession trainer's window is a different thing, and
+from outside, learning the next rank of Blacksmithing and buying a recipe look identical. Rather
+than guess and spend the character's money on the wrong row, the crafting base stops with
+`Capped` and says a trainer is needed.
 
 ## Skinning
 

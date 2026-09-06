@@ -50,6 +50,7 @@ public sealed class LiveBotState : IBotState, IProfileConditionContext
     private readonly LuaBattlegrounds _battlegrounds;
     private readonly LuaInventory _inventory;
     private readonly LuaVendor _vendor;
+    private readonly LuaTrainer _trainer;
     private readonly LuaTalents _talents;
     private readonly LuaTravel _travel;
     private readonly SessionScheduler _session;
@@ -68,6 +69,7 @@ public sealed class LiveBotState : IBotState, IProfileConditionContext
         LuaBattlegrounds battlegrounds,
         LuaInventory inventory,
         LuaVendor vendor,
+        LuaTrainer trainer,
         LuaTalents talents,
         LuaTravel travel,
         SessionScheduler session,
@@ -86,6 +88,7 @@ public sealed class LiveBotState : IBotState, IProfileConditionContext
         _battlegrounds = battlegrounds ?? throw new ArgumentNullException(nameof(battlegrounds));
         _inventory = inventory ?? throw new ArgumentNullException(nameof(inventory));
         _vendor = vendor ?? throw new ArgumentNullException(nameof(vendor));
+        _trainer = trainer ?? throw new ArgumentNullException(nameof(trainer));
         _talents = talents ?? throw new ArgumentNullException(nameof(talents));
         _travel = travel ?? throw new ArgumentNullException(nameof(travel));
         _session = session ?? throw new ArgumentNullException(nameof(session));
@@ -318,6 +321,9 @@ public sealed class LiveBotState : IBotState, IProfileConditionContext
     public IVendorActions Vendor => _vendor;
 
     /// <inheritdoc />
+    public ITrainerActions Trainer => _trainer;
+
+    /// <inheritdoc />
     public ITalents Talents => _talents;
 
     /// <inheritdoc />
@@ -389,5 +395,6 @@ public sealed class LiveBotState : IBotState, IProfileConditionContext
         _battlegrounds.Invalidate();
         _inventory.Invalidate();
         _vendor.Invalidate();
+        _trainer.Invalidate();
     }
 }

@@ -105,10 +105,18 @@ Most trade materials cannot be bought at all — ore, herbs, leather and cloth c
 — so stopping is still the ordinary outcome, and with no export it is the only outcome. What
 this fixes is the narrower case of a session ending for want of a stack of thread.
 
-The `Train` errand does work when world data is exported — the creature table says which trainer
-teaches which class, which the trainer flag alone does not. Profession trainers are still out of
-reach: the bot does not read a trainer's window, so it cannot tell learning a new rank from
-buying a recipe, and hitting the skill cap stops the session rather than fixing itself.
+### Training works; profession trainers do not
+
+With world data exported the bot finds a trainer for the character's own class — the creature
+table says which trainer teaches which class, which the trainer flag alone does not — walks
+there, and learns everything on offer it can afford, keeping money back for the repair bill. No
+spell data is involved: the trainer knows what this character's class, level and money allow,
+and it is asked.
+
+Profession trainers are a different matter. The bot can find one, but it does not know what a
+profession trainer's window means: learning the next rank of a profession and buying a recipe
+look the same from outside, and the Train errand is written for a class trainer. So hitting a
+skill cap still stops a crafting session rather than fixing itself.
 
 ### Objective steps know what a quest wants, given the export
 
@@ -137,6 +145,7 @@ code, and each has a manual test script section that checks it.
 | `GetTradeSkillReagentInfo` returns needed and carried in that order | `LuaTradeSkills` | [phase 9](phase-9-manual-test.md) §2 |
 | `BuyMerchantItem` counts individual items rather than purchases | `LuaVendor` | [phase 9](phase-9-manual-test.md) §4 |
 | The client's objective order matches the database's column order | `QuestObjectives` | [phase 9](phase-9-manual-test.md) §6 |
+| `GetTrainerServiceInfo`'s third return is the availability category | `LuaTrainer` | [phase 5](phase-5-manual-test.md) §5 |
 | Three offsets remain documented assumptions rather than verified | [offsets.md](offsets.md) | [phase 1](phase-1-manual-test.md) |
 
 **The bot checks what it can, at attach time.** When execution is enabled it asks the client

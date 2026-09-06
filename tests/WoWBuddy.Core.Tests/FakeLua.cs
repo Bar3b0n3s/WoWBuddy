@@ -112,6 +112,8 @@ public sealed class FakeLua : ILuaEvaluator
             "GetMerchantNumItems", "GetMerchantItemInfo", "GetMerchantItemLink", "BuyMerchantItem",
             "CanMerchantRepair", "RepairAllItems", "GetRepairAllCost", "GetContainerItemInfo",
             "SendMail", "ClearSendMail", "CloseMerchant", "CloseMail",
+            "GetNumTrainerServices", "GetTrainerServiceInfo", "GetTrainerServiceCost",
+            "BuyTrainerService", "SetTrainerServiceTypeFilter", "CloseTrainer",
             "GetUnspentTalentPoints", "GetTalentInfo", "LearnTalent",
             "IsUsableSpell", "CastSpellByName", "Dismount", "GetRealmName");
 

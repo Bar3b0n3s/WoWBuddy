@@ -37,6 +37,7 @@ public sealed class BotRunnerTests
             new LuaBattlegrounds(lua, capabilities, () => Now),
             new LuaInventory(lua, capabilities, () => Now),
             new LuaVendor(lua, capabilities, () => Now),
+            new LuaTrainer(lua, capabilities, () => Now),
             new LuaTalents(lua, capabilities),
             new LuaTravel(lua, capabilities, () => false, "Riding Horse"),
             new SessionScheduler(new SessionSchedule()),

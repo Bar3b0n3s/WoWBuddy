@@ -3,6 +3,24 @@ using WoWBuddy.Profiles;
 
 namespace WoWBuddy.BotBases.Support;
 
+/// <summary>Which window a trip is waiting for.</summary>
+/// <remarks>
+/// They are different windows with different calls behind them, and waiting for the wrong one
+/// means waiting forever at an NPC that opened perfectly. The Train errand did exactly that: it
+/// walked to a trainer and then watched for a merchant.
+/// </remarks>
+public enum VendorWindow
+{
+    /// <summary>A merchant, for selling, repairing and buying.</summary>
+    Merchant,
+
+    /// <summary>A mailbox.</summary>
+    Mailbox,
+
+    /// <summary>A trainer.</summary>
+    Trainer,
+}
+
 /// <summary>How far a trip to a vendor has got.</summary>
 public enum ApproachResult
 {
@@ -70,11 +88,11 @@ public sealed class VendorApproach
     /// </summary>
     /// <param name="state">What the bot can see and do.</param>
     /// <param name="destination">Where to go and what to click.</param>
-    /// <param name="wantMailbox">
-    /// True to wait for a mailbox rather than a merchant. They are different windows, and
-    /// waiting for the wrong one means waiting forever at a vendor that opened perfectly.
-    /// </param>
-    public ApproachResult Step(IBotState state, ProfileVendor destination, bool wantMailbox = false)
+    /// <param name="window">Which window counts as having arrived.</param>
+    public ApproachResult Step(
+        IBotState state,
+        ProfileVendor destination,
+        VendorWindow window = VendorWindow.Merchant)
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(destination);
@@ -90,7 +108,12 @@ public sealed class VendorApproach
 
         state.StopMoving();
 
-        bool open = wantMailbox ? state.Vendor.IsMailboxOpen : state.Vendor.IsMerchantOpen;
+        bool open = window switch
+        {
+            VendorWindow.Mailbox => state.Vendor.IsMailboxOpen,
+            VendorWindow.Trainer => state.Trainer.IsTrainerOpen,
+            _ => state.Vendor.IsMerchantOpen,
+        };
 
         if (open)
         {
